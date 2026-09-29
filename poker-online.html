@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3人ポーカー</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--fg:#1a1c20;--cd:#fff;--ac:#2f6fed;--mu:#6b7280;--rd:#d33}
+@media(prefers-color-scheme:dark){:root{--bg:#15171b;--fg:#eceef2;--cd:#22252b;--ac:#6c9bff;--mu:#9aa1ad;--rd:#ff7b7b}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans JP",sans-serif}
+main{max-width:480px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 12px}h2{font-size:15px;margin:0 0 8px;color:var(--mu)}
+.box{background:var(--cd);border-radius:12px;padding:12px;margin-bottom:12px}
+.hand{display:flex;gap:6px}
+.c{flex:1;padding:14px 0;text-align:center;font-size:22px;font-weight:700;border-radius:8px;border:2px solid transparent;background:var(--bg);color:var(--fg)}
+.c.r{color:var(--rd)}.c.s{border-color:var(--ac);transform:translateY(-6px)}
+button.b,input{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid var(--mu);background:var(--cd);color:var(--fg);box-sizing:border-box}
+button.b{background:var(--ac);color:#fff;border:0;width:100%;margin-top:10px}
+input{width:100%;margin-bottom:6px}
+.row{display:flex;justify-content:space-between;padding:2px 0}.mu{color:var(--mu)}.pos{color:#2b9a4f}.neg{color:var(--rd)}
+.code{font-size:32px;font-weight:700;letter-spacing:6px;text-align:center}
+svg{width:100%;height:auto;display:block}
+</style></head><body><main>
+<h1>♠ 3人ポーカー（5枚ドロー）</h1>
+<div id="app"></div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const HN=["ハイカード","ワンペア","ツーペア","スリーカード","ストレート","フラッシュ","フルハウス","フォーカード","ストレートフラッシュ"];
+const SU=['♠','♥','♦','♣'],COL=['#2f6fed','#e8590c','#2b9a4f'],ANTE=10;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cs=c=>SU[c/13|0]+({11:'J',12:'Q',13:'K',14:'A'}[c%13+2]||c%13+2);
+const rd=c=>[1,2].includes(c/13|0);
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function deck(r){const d=[...Array(52).keys()],f=rng(r*7919+S.seed);for(let i=51;i>0;i--){const j=f()*(i+1)|0;[d[i],d[j]]=[d[j],d[i]]}return d}
+function ev(h){
+  const r=h.map(c=>c%13+2).sort((a,b)=>b-a),fl=h.every(c=>(c/13|0)==(h[0]/13|0)),n={};
+  r.forEach(x=>n[x]=(n[x]||0)+1);
+  const g=Object.entries(n).map(([k,v])=>[v,+k]).sort((a,b)=>b[0]-a[0]||b[1]-a[1]);
+  let k=g.map(x=>x[1]),st=g.length==5&&r[0]-r[4]==4;
+  if(g.length==5&&r.join()=="14,5,4,3,2"){st=true;k=[5,4,3,2,1]}
+  const cat=st&&fl?8:g[0][0]==4?7:g[0][0]==3&&g[1][0]==2?6:fl?5:st?4:g[0][0]==3?3:g[0][0]==2&&g[1][0]==2?2:g[0][0]==2?1:0;
+  return[cat,...k];
+}
+const cmp=(a,b)=>{for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]||0)-(b[i]||0);if(d)return d}return 0};
+function play(r,P){
+  const d=deck(r);
+  const o=P.map((p,i)=>{const h=d.slice(i*5,i*5+5),x=(p.rounds||{})[r]||[];x.forEach((j,k)=>h[j]=d[15+i*5+k]);return{name:p.name,h,sc:ev(h)}});
+  const best=o.reduce((a,b)=>cmp(a,b.sc)>=0?a:b.sc,o[0].sc);
+  const w=o.filter(x=>!cmp(x.sc,best)),share=ANTE*o.length/w.length;
+  o.forEach(x=>{x.win=w.includes(x);x.d=(x.win?share:0)-ANTE});
+  return o;
+}
+function done(P){const a=[];for(let r=1;P.every(p=>(p.rounds||{})[r]);r++)a.push(play(r,P));return a}
+
+// ---- 通信（ホストが正、ゲストは操作を送るだけ）----
+let S={seed:1,players:[]},peer=null,isHost=false,conn=null,conns=[],myName='',code='',msg='',sel=new Set(),selR=0;
+try{myName=localStorage.getItem('pk')||''}catch(e){}
+const bc=()=>conns.forEach(c=>c.open&&c.send({t:'s',S}));
+function apply(m){
+  if(m.t=='join'&&!S.players.find(p=>p.name==m.name)&&S.players.length<3)S.players.push({name:m.name,rounds:{}});
+  if(m.t=='commit'){const p=S.players.find(p=>p.name==m.name);if(p&&!p.rounds[m.r])p.rounds[m.r]=m.d}
+  bc();render();
+}
+const send=m=>isHost?apply(m):(conn&&conn.open&&conn.send(m));
+function name(){const n=$('#nm').value.trim().slice(0,12);if(!n){msg='名前を入れてください';render();return null}
+  myName=n;try{localStorage.setItem('pk',n)}catch(e){}return n}
+function host(){
+  if(!name())return;
+  if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
+  code=String(1000+Math.random()*9000|0);msg='接続中…';render();
+  setTimeout(()=>{if(!isHost){msg='サーバーに接続できません。ネット接続を確認して、Chromeで開き直してください';render()}},12000);
+  peer=new Peer('pinepk-'+code);
+  peer.on('open',()=>{isHost=true;msg='';S={seed:Math.random()*1e6|0,players:[]};apply({t:'join',name:myName})});
+  peer.on('connection',c=>{conns.push(c);c.on('open',()=>c.send({t:'s',S}));c.on('data',apply)});
+  peer.on('error',e=>{msg='エラー: '+e.type+'（もう一度試してください）';render()});
+}
+function joinRoom(){
+  if(!name())return;
+  if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
+  code=$('#cd').value.trim();msg='接続中…';render();
+  setTimeout(()=>{if(!(conn&&conn.open)&&!S.players.length){msg='接続できません。部屋コードとネット接続を確認して、Chromeで開き直してください';render()}},12000);
+  peer=new Peer();
+  peer.on('open',()=>{
+    conn=peer.connect('pinepk-'+code,{serialization:'json'});
+    conn.on('open',()=>{msg='';conn.send({t:'join',name:myName})});
+    conn.on('data',m=>{if(m.t=='s'){S=m.S;render()}});
+    conn.on('close',()=>{msg='ホストとの接続が切れました。ページを開き直してください';conn=null;render()});
+  });
+  peer.on('error',e=>{msg=e.type=='peer-unavailable'?'その部屋コードは見つかりません':'エラー: '+e.type;render()});
+}
+function commit(r){send({t:'commit',name:myName,r,d:[...sel].sort()});sel=new Set()}
+function tog(i){sel.has(i)?sel.delete(i):sel.add(i);render()}
+
+// ---- 表示 ----
+function chart(P,res){
+  const n=res.length;if(!n)return'';
+  const ser=P.map((_,i)=>{let s=0;return[0,...res.map(r=>s+=r[i].d)]});
+  const all=ser.flat(),mn=Math.min(...all,0),mx=Math.max(...all,0),sp=(mx-mn)||1;
+  const X=i=>10+i/n*280,Y=v=>10+(mx-v)/sp*110;
+  let s=`<svg viewBox="0 0 300 130"><line x1="10" x2="290" y1="${Y(0)}" y2="${Y(0)}" stroke="currentColor" opacity=".3"/>`;
+  ser.forEach((a,i)=>s+=`<polyline fill="none" stroke="${COL[i]}" stroke-width="2.5" points="${a.map((v,j)=>X(j)+','+Y(v)).join(' ')}"/>`);
+  return s+'</svg>'+P.map((p,i)=>`<span style="color:${COL[i]}">● ${esc(p.name)}</span> `).join('');
+}
+function render(){
+  const A=$('#app'),M=msg?`<p class="mu">${esc(msg)}</p>`:'';
+  const P=[...S.players].sort((a,b)=>a.name<b.name?-1:1),i=P.findIndex(p=>p.name==myName);
+  if(i<0){
+    A.innerHTML=`<div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
+<button class="b" onclick="host()">部屋を作る</button></div>
+<div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（4桁）">
+<button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}`;return;
+  }
+  const codeBox=`<div class="box"><h2>部屋コード</h2><div class="code">${esc(code)}</div></div>`;
+  if(P.length<3){A.innerHTML=(isHost?codeBox:'')+`<div class="box">友達を待っています（${P.length}/3）<br><span class="mu">${P.map(p=>esc(p.name)).join('、')}</span></div>${M}`;return}
+  const me=P[i],res=done(P),r=res.length+1,mine=me.rounds[r];
+  if(selR!=r){sel=new Set();selR=r}
+  const base=deck(r).slice(i*5,i*5+5);
+  const hand=mine?play(r,P.map(p=>p==me?me:{name:p.name,rounds:{}}))[i].h:base;
+  let h=M+`<div class="box"><h2>ラウンド ${r}（参加費 ${ANTE}）</h2><div class="hand">`+hand.map((c,j)=>`<button class="c ${rd(c)?'r':''} ${!mine&&sel.has(j)?'s':''}" ${mine?'disabled':`onclick="tog(${j})"`}>${cs(c)}</button>`).join('')+'</div>';
+  if(mine)h+=`<p class="mu">あなたの役: ${HN[ev(hand)[0]]}　他の人を待っています…</p>`;
+  else h+=`<button class="b" onclick="commit(${r})">${sel.size?sel.size+'枚交換して確定':'そのままで確定'}</button><p class="mu">交換したいカードをタップ</p>`;
+  h+='<div class="mu">'+P.map(p=>`${esc(p.name)} ${p.rounds[r]?'✅':'…'}`).join('　')+'</div></div>';
+  if(res.length){
+    h+=`<div class="box"><h2>ラウンド ${res.length} の結果</h2>`+res[res.length-1].map(x=>`<div class="row"><span>${x.win?'🏆':''}${esc(x.name)}　${x.h.map(cs).join(' ')} <span class="mu">${HN[x.sc[0]]}</span></span><b class="${x.d>=0?'pos':'neg'}">${x.d>0?'+':''}${x.d}</b></div>`).join('')+'</div>';
+    h+='<div class="box"><h2>チップ（マイナスあり）</h2>'+P.map((p,k)=>{const t=res.reduce((s,q)=>s+q[k].d,0);return`<div class="row"><span>${esc(p.name)}</span><b class="${t>=0?'pos':'neg'}">${t>0?'+':''}${t}</b></div>`}).join('')+chart(P,res)+'</div>';
+  }
+  A.innerHTML=h;
+}
+render();
+</script></body></html>
