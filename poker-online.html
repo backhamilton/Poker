@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>3人ポーカー</title>
+<title>ポーカー（2〜5人）</title>
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js"></script>
 <style>
 :root{--bg:#f6f7f9;--fg:#1a1c20;--cd:#fff;--ac:#2f6fed;--mu:#6b7280;--rd:#d33}
@@ -21,7 +21,7 @@ input{width:100%;margin-bottom:6px}
 .code{font-size:32px;font-weight:700;letter-spacing:6px;text-align:center}
 svg{width:100%;height:auto;display:block}
 </style></head><body><main>
-<h1>♠ 3人ポーカー（5枚ドロー・ベットあり）</h1>
+<h1>♠ ポーカー（5枚ドロー・2〜5人）</h1>
 <div id="app"></div>
 <button id="lv" class="b g" style="display:none" onclick="leave()">退出する</button>
 <details><summary class="mu">接続ログ（つながらないとき見せてください）</summary><pre id="log" style="white-space:pre-wrap;font-size:12px"></pre></details>
@@ -29,7 +29,7 @@ svg{width:100%;height:auto;display:block}
 <script>
 const $=s=>document.querySelector(s);
 const HN=["ハイカード","ワンペア","ツーペア","スリーカード","ストレート","フラッシュ","フルハウス","フォーカード","ストレートフラッシュ"];
-const SU=['♠','♥','♦','♣'],COL=['#2f6fed','#e8590c','#2b9a4f'];
+const SU=['♠','♥','♦','♣'],COL=['#2f6fed','#e8590c','#2b9a4f','#a020c0','#c9a800'],MIN=2,MAX=5;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cs=c=>SU[c/13|0]+({11:'J',12:'Q',13:'K',14:'A'}[c%13+2]||c%13+2);
 const rd=c=>[1,2].includes(c/13|0);
@@ -48,42 +48,42 @@ const cmp=(a,b)=>{for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]||
 
 // ---- ゲーム進行（ホストだけが実行）----
 let S={seed:1,players:[],hist:[],H:null,ante:10};
-const alive=H=>[0,1,2].filter(x=>!H.fold[x]);
-function hands(){const H=S.H,d=deck(H.r);return[0,1,2].map(i=>{const h=d.slice(i*5,i*5+5);(H.disc[i]||[]).forEach((j,k)=>h[j]=d[15+i*5+k]);return h})}
+const alive=H=>[...Array(H.n).keys()].filter(x=>!H.fold[x]);
+function hands(){const H=S.H,d=deck(H.r);return[...Array(H.n).keys()].map(i=>{const h=d.slice(i*5,i*5+5);(H.disc[i]||[]).forEach((j,k)=>h[j]=d[H.n*5+i*5+k]);return h})}
 function startGame(){
-  if((S.gone||[]).length){cleanup();bc();render();return}
+  if((S.gone||[]).length)cleanup();
   const a=Math.min(1000,Math.max(1,parseInt($('#an').value)||10));
-  if(S.players.length<3)return;
-  const r=S.hist.length+1;S.ante=a;
-  S.H={r,ante:a,phase:'bet1',turn:(r-1)%3,pot:a*3,inv:[a,a,a],rb:[0,0,0],cb:0,acted:[0,0,0],fold:[0,0,0],disc:[null,null,null]};
+  const n=S.players.length;if(n<MIN){bc();render();return}
+  const r=S.hist.length+1,z=v=>Array(n).fill(v);S.ante=a;
+  S.H={r,n,ante:a,phase:'bet1',turn:(r-1)%n,pot:a*n,inv:z(a),rb:z(0),cb:0,acted:z(0),fold:z(0),disc:z(null)};
   bc();render();
 }
 function endHand(sd){
   const H=S.H,al=alive(H),hs=hands();let w=al;
   if(sd&&al.length>1){const sc=hs.map(ev),b=al.reduce((m,i)=>cmp(sc[i],sc[m])>0?i:m,al[0]);w=al.filter(i=>!cmp(sc[i],sc[b]))}
-  const dl=[0,1,2].map(i=>-H.inv[i]),sh=Math.floor(H.pot/w.length);
+  const dl=Array.from({length:H.n},(_,i)=>-H.inv[i]),sh=Math.floor(H.pot/w.length);
   w.forEach((i,k)=>dl[i]+=sh+(k?0:H.pot-sh*w.length));
-  S.hist.push(dl);H.phase='end';H.res={dl,w,sd:sd&&al.length>1,hs};
+  S.hist.push(Object.fromEntries(S.players.map((q,k)=>[q,dl[k]])));H.phase='end';H.res={dl,w,sd:sd&&al.length>1,hs};
 }
 function adv(i){
   const H=S.H;
   if(alive(H).length==1)return endHand(0);
-  for(let k=1;k<=2;k++){const j=(i+k)%3;if(!H.fold[j]&&!(H.acted[j]&&H.rb[j]==H.cb)){H.turn=j;return}}
-  if(H.phase=='bet1'){H.phase='bet2';H.rb=[0,0,0];H.cb=0;H.acted=[0,0,0];let t=(H.r-1)%3;while(H.fold[t])t=(t+1)%3;H.turn=t}else endHand(1);
+  for(let k=1;k<H.n;k++){const j=(i+k)%H.n;if(!H.fold[j]&&!(H.acted[j]&&H.rb[j]==H.cb)){H.turn=j;return}}
+  if(H.phase=='bet1'){H.phase='bet2';H.rb=Array(H.n).fill(0);H.cb=0;H.acted=Array(H.n).fill(0);let t=(H.r-1)%H.n;while(H.fold[t])t=(t+1)%H.n;H.turn=t}else endHand(1);
 }
 function act(i,a,n){
   const H=S.H;
   if(a=='fold')H.fold[i]=1;
   else{
     let put=H.cb-H.rb[i];
-    if(a=='raise'){n=Math.min(1000,Math.max(H.ante,parseInt(n)||0));put+=n;H.cb+=n;H.acted=[0,0,0]}
+    if(a=='raise'){n=Math.min(1000,Math.max(H.ante,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0)}
     H.rb[i]+=put;H.inv[i]+=put;H.pot+=put;
   }
   H.acted[i]=1;adv(i);
 }
-function cleanup(){S.players=S.players.filter(p=>!(S.gone||[]).includes(p));S.gone=[];S.hist=[];S.H=null}
+function cleanup(){S.players=S.players.filter(p=>!(S.gone||[]).includes(p));S.gone=[];S.H=null}
 function apply(m){
-  if(m.t=='join'){if(!S.players.includes(m.name)&&S.players.length<3)S.players.push(m.name);S.gone=(S.gone||[]).filter(x=>x!=m.name)}
+  if(m.t=='join'){if(!S.players.includes(m.name)&&S.players.length<MAX&&(!S.H||S.H.phase=='end'))S.players.push(m.name);S.gone=(S.gone||[]).filter(x=>x!=m.name)}
   const H=S.H,i=S.players.indexOf(m.name);
   if(m.t=='leave'&&i>=0){
     S.gone=[...new Set([...(S.gone||[]),m.name])];
@@ -98,13 +98,13 @@ function apply(m){
 }
 
 // ---- 通信（公開MQTTサーバー経由の中継。ホストが正）----
-const VER='2.0（2026-09-30・中継サーバー方式）';
+const VER='2.1（2026-09-30）';
 const BR=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let left=false,cl=null,hb=null,isHost=false,myName='',code='',msg='',sel=new Set(),selK='';
 try{myName=localStorage.getItem('pk')||''}catch(e){}
-const top=s=>'pinepk/'+code+'/'+s;
-function pub(t,o){if(cl&&cl.connected)cl.publish(top(t),JSON.stringify(o),{qos:1,retain:t=='s'&&!o.t})}
+const tp=s=>'pinepk/'+code+'/'+s;
+function pub(t,o){if(cl&&cl.connected)cl.publish(tp(t),JSON.stringify(o),{qos:1,retain:t=='s'&&!o.t})}
 const bc=()=>{if(isHost)pub('s',{S,ts:Date.now()})};
 const send=m=>isHost?apply(m):pub('a',m);
 function name(){const n=$('#nm').value.trim().slice(0,12);if(!n){msg='名前を入れてください';render();return null}
@@ -130,7 +130,7 @@ function host(){
     conn(bi,c=>{
       if(!c)return tryB(bi+1);
       cl=c;code=bi+String(10000+Math.random()*90000|0);isHost=true;msg='';
-      c.subscribe(top('a'),{qos:1});
+      c.subscribe(tp('a'),{qos:1});
       c.on('message',(t,p)=>{try{apply(JSON.parse(p.toString()))}catch(e){}});
       S={seed:Math.random()*1e6|0,players:[],hist:[],H:null,ante:10};
       apply({t:'join',name:myName});
@@ -155,13 +155,13 @@ function joinRoom(){
       if(!got)lg('部屋の状態を受信');
       got=true;S=m.S;msg='';render();
     });
-    c.subscribe(top('s'),{qos:1},()=>pub('a',{t:'join',name:myName}));
+    c.subscribe(tp('s'),{qos:1},()=>pub('a',{t:'join',name:myName}));
     setTimeout(()=>{if(!got){msg='その部屋コードは見つかりません。コードと、ホストが部屋を開いたままか確認してください';render()}},8000);
   });
 }
 function leave(){
   if(!confirm('退出しますか？'))return;
-  const c=cl,t=top('s'),h=isHost;
+  const c=cl,t=tp('s'),h=isHost;
   if(h)pub('s',{t:'x'});else send({t:'leave',name:myName});
   setTimeout(()=>{try{if(h)c.publish(t,'',{qos:1,retain:true});c.end()}catch(e){}},600);
   cl=null;isHost=false;clearInterval(hb);
@@ -174,7 +174,7 @@ function tog(i){sel.has(i)?sel.delete(i):sel.add(i);render()}
 // ---- 表示 ----
 function chart(){
   const n=S.hist.length;if(!n)return'';
-  const ser=S.players.map((_,i)=>{let s=0;return[0,...S.hist.map(r=>s+=r[i])]});
+  const ser=S.players.map(q=>{let s=0;return[0,...S.hist.map(r=>s+=(r[q]||0))]});
   const all=ser.flat(),mn=Math.min(...all,0),mx=Math.max(...all,0),sp=(mx-mn)||1;
   const X=i=>10+i/n*280,Y=v=>10+(mx-v)/sp*110;
   let s=`<svg viewBox="0 0 300 130"><line x1="10" x2="290" y1="${Y(0)}" y2="${Y(0)}" stroke="currentColor" opacity=".3"/>`;
@@ -187,21 +187,22 @@ function render(){
   const A=$('#app'),M=msg?`<p class="mu">${esc(msg)}</p>`:'',P=S.players,i=P.indexOf(myName);
   $('#lv').style.display=(i>=0&&!left)?'block':'none';
   if(i<0||left){
-    A.innerHTML=`<p class="mu" style="margin:0 0 8px">3人ポーカー（5枚ドロー・ベットあり）　バージョン ${VER}</p>
+    A.innerHTML=`<p class="mu" style="margin:0 0 8px">ポーカー（5枚ドロー・ベットあり・2〜5人）　バージョン ${VER}</p>
 <div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
 <button class="b" onclick="host()">部屋を作る</button></div>
 <div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（6桁）">
-<button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}`;return;
+<button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}${!left&&S.players.length?(S.players.length>=MAX?'<p class="mu">満席です（'+MAX+'人まで）。</p>':S.H&&S.H.phase!='end'?'<p class="mu">ゲーム進行中は入れません。次のゲームが始まる前にもう一度入ってください。</p>':''):''}`;return;
   }
   const codeBox=isHost?`<div class="box"><h2>部屋コード</h2><div class="code">${esc(code)}</div></div>`:'';
-  if(P.length<3){A.innerHTML=codeBox+`<div class="box">友達を待っています（${P.length}/3）<br><span class="mu">${P.map(esc).join('、')}</span></div>${M}`;return}
   const H=S.H;let h=M;
-  const tot=P.map((_,k)=>S.hist.reduce((s,r)=>s+r[k],0));
+  const tot=P.map(q=>S.hist.reduce((s,r)=>s+(r[q]||0),0));
   if(!H||H.phase=='end'){
+    h=codeBox+h;
     if(H){const R=H.res;
-      h+=`<div class="box"><h2>ゲーム ${H.r} の結果${R.sd?'':'（フォールドで決着）'}</h2>`+P.map((p,k)=>`<div class="row"><span>${R.w.includes(k)?'🏆':''}${esc(p)} ${R.sd&&!H.fold[k]?R.hs[k].map(cs).join(' ')+' <span class="mu">'+HN[ev(R.hs[k])[0]]+'</span>':H.fold[k]?'<span class="mu">フォールド</span>':''}</span><b class="${R.dl[k]>=0?'pos':'neg'}">${sg(R.dl[k])}</b></div>`).join('')+'</div>';
+      h+=`<div class="box"><h2>ゲーム ${H.r} の結果${R.sd?'':'（フォールドで決着）'}</h2>`+P.slice(0,H.n).map((p,k)=>`<div class="row"><span>${R.w.includes(k)?'🏆':''}${esc(p)} ${R.sd&&!H.fold[k]?R.hs[k].map(cs).join(' ')+' <span class="mu">'+HN[ev(R.hs[k])[0]]+'</span>':H.fold[k]?'<span class="mu">フォールド</span>':''}</span><b class="${R.dl[k]>=0?'pos':'neg'}">${sg(R.dl[k])}</b></div>`).join('')+'</div>';
     }
-    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人がいます。続けるとその人は外れ、記録はリセットされます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}"><button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button></div>`
+    h+=`<div class="box"><h2>参加中（${P.length}/${MAX}人・${MIN}人から開始）</h2>${P.map(esc).join('、')}</div>`;
+    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人がいます。続けるとその人は外れます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}">${P.length<MIN?'<p class="mu">'+MIN+'人以上そろうと始められます</p>':`<button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button>`}</div>`
       :`<div class="box mu">ホストがゲームを始めるのを待っています…</div>`;
   }else{
     const hs=hands(),myT=H.turn==i&&(H.phase=='bet1'||H.disc[i]!=null);
