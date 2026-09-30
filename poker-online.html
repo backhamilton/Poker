@@ -51,7 +51,7 @@ const alive=H=>[...Array(H.n).keys()].filter(x=>!H.fold[x]);
 function hands(){const H=S.H,d=deck(H.r);return[...Array(H.n).keys()].map(i=>{const h=d.slice(i*5,i*5+5);(H.disc[i]||[]).forEach((j,k)=>h[j]=d[H.n*5+i*5+k]);return h})}
 function startGame(){
   if((S.gone||[]).length)cleanup();
-  const a=Math.min(1000,Math.max(1,parseInt($('#an').value)||10));
+  const a=Math.max(1,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt($('#an').value)||10));
   const n=S.players.length;if(n<MIN){bc();render();return}
   const r=(S.hn||0)+1,z=v=>Array(n).fill(v);S.ante=a;
   S.H={r,n,ante:a,phase:'bet1',turn:(r-1)%n,pot:a*n,inv:z(a),rb:z(0),cb:0,acted:z(0),fold:z(0),disc:z(null)};
@@ -76,7 +76,7 @@ function act(i,a,n){
   if(a=='fold')H.fold[i]=1;
   else{
     let put=H.cb-H.rb[i];
-    if(a=='raise'){n=Math.min(1000,Math.max(H.ante,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0)}
+    if(a=='raise'){n=Math.max(H.ante,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0)}
     H.rb[i]+=put;H.inv[i]+=put;H.pot+=put;
   }
   H.acted[i]=1;adv(i);
@@ -98,7 +98,7 @@ function apply(m){
 }
 
 // ---- 通信（ntfy.sh 経由・HTTPS/443。ホストが正）----
-const VER='2.2（2026-09-30・ntfy中継）';
+const VER='2.3（2026-09-30・ntfy中継）';
 const NT='https://ntfy.sh/';
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let left=false,es=null,isHost=false,myName='',code='',msg='',sel=new Set(),selK='',q=Promise.resolve();
