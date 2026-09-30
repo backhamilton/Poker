@@ -2,7 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>3人ポーカー</title>
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js"></script>
 <style>
 :root{--bg:#f6f7f9;--fg:#1a1c20;--cd:#fff;--ac:#2f6fed;--mu:#6b7280;--rd:#d33}
 @media(prefers-color-scheme:dark){:root{--bg:#15171b;--fg:#eceef2;--cd:#22252b;--ac:#6c9bff;--mu:#9aa1ad;--rd:#ff7b7b}}
@@ -97,55 +97,75 @@ function apply(m){
   bc();render();
 }
 
-// ---- 通信 ----
-const CFG={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
+// ---- 通信（公開MQTTサーバー経由の中継。ホストが正）----
+const VER='2.0（2026-09-30・中継サーバー方式）';
+const BR=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
-let left=false,peer=null,isHost=false,conn=null,conns=[],myName='',code='',msg='',sel=new Set(),selK='';
+let left=false,cl=null,hb=null,isHost=false,myName='',code='',msg='',sel=new Set(),selK='';
 try{myName=localStorage.getItem('pk')||''}catch(e){}
-const bc=()=>conns.forEach(c=>c.open&&c.send({t:'s',S}));
-const send=m=>isHost?apply(m):(conn&&conn.open&&conn.send(m));
+const top=s=>'pinepk/'+code+'/'+s;
+function pub(t,o){if(cl&&cl.connected)cl.publish(top(t),JSON.stringify(o),{qos:1,retain:t=='s'&&!o.t})}
+const bc=()=>{if(isHost)pub('s',{S,ts:Date.now()})};
+const send=m=>isHost?apply(m):pub('a',m);
 function name(){const n=$('#nm').value.trim().slice(0,12);if(!n){msg='名前を入れてください';render();return null}
   myName=n;left=false;try{localStorage.setItem('pk',n)}catch(e){}return n}
+function conn(bi,cb){
+  lg('接続 '+BR[bi].slice(6,22));
+  const c=mqtt.connect(BR[bi],{clientId:'pk'+Math.random().toString(36).slice(2,10),clean:true,connectTimeout:8000,reconnectPeriod:3000});
+  let done=false;
+  const fin=ok=>{if(done)return;done=true;if(!ok)try{c.end(true)}catch(e){}cb(ok?c:null)};
+  c.on('connect',()=>{lg('サーバー接続OK');fin(true)});
+  c.on('error',e=>{lg('mqtt error '+(e.message||e));fin(false)});
+  c.on('close',()=>{lg('切断');fin(false)});
+  c.on('reconnect',()=>lg('再接続中'));
+  setTimeout(()=>fin(false),9000);
+}
+function closeLocal(text){try{cl&&cl.end(true)}catch(e){}cl=null;isHost=false;clearInterval(hb);S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg=text;sel=new Set();render()}
 function host(){
   if(!name())return;
-  if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
-  code=String(1000+Math.random()*9000|0);msg='接続中…';render();
-  setTimeout(()=>{if(!isHost){msg='サーバーに接続できません。ネット接続を確認して、Chromeで開き直してください';render()}},12000);
-  peer=new Peer('pinepk-'+code,CFG);lg('ホスト起動 '+code);
-  peer.on('open',()=>{isHost=true;msg='';S={seed:Math.random()*1e6|0,players:[],hist:[],H:null,ante:10};apply({t:'join',name:myName})});
-  peer.on('connection',c=>{lg('着信 '+c.peer.slice(0,6));c.on('iceStateChanged',x=>lg('ICE(着信) '+x));c.on('error',x=>lg('conn error '+x));conns.push(c);c.on('close',()=>{conns=conns.filter(x=>x!==c)});c.on('open',()=>c.send({t:'s',S}));c.on('data',apply)});
-  peer.on('error',e=>{lg('host error '+e.type);msg='エラー: '+e.type+'（もう一度試してください）';render()});
-  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
+  if(typeof mqtt=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
+  msg='接続中…';render();
+  const tryB=bi=>{
+    if(bi>=BR.length){msg='サーバーに接続できません。ネット接続を確認して、もう一度試してください';render();return}
+    conn(bi,c=>{
+      if(!c)return tryB(bi+1);
+      cl=c;code=bi+String(10000+Math.random()*90000|0);isHost=true;msg='';
+      c.subscribe(top('a'),{qos:1});
+      c.on('message',(t,p)=>{try{apply(JSON.parse(p.toString()))}catch(e){}});
+      S={seed:Math.random()*1e6|0,players:[],hist:[],H:null,ante:10};
+      apply({t:'join',name:myName});
+      hb=setInterval(bc,15000);lg('部屋 '+code);
+    });
+  };
+  tryB(0);
 }
 function joinRoom(){
   if(!name())return;
-  if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
-  code=$('#cd').value.trim();msg='接続中…';render();
-  peer=new Peer(undefined,CFG);
-  peer.on('open',()=>{
-    lg('guest peer open');let n=0;
-    const go=()=>{
-      if(conn&&conn.open)return;
-      if(++n>4){msg='つながりません。ホストがChromeを開いたままか確認して、もう一度試してください';render();return}
-      msg='接続中…（'+n+'/4）';render();
-      if(conn)try{conn.close()}catch(e){}
-      const c=conn=peer.connect('pinepk-'+code,{serialization:'json',reliable:true});
-      c.on('iceStateChanged',x=>lg('ICE '+x));c.on('error',x=>lg('conn error '+x));
-      c.on('open',()=>{lg('接続OK');msg='';c.send({t:'join',name:myName})});
-      c.on('data',m=>{if(m.t=='x'){conn=null;S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg='ホストが退出したため部屋が閉じました';try{peer.destroy()}catch(e){}peer=null;render();return}if(m.t=='s'){S=m.S;render()}});
-      c.on('close',()=>{if(conn===c){msg='ホストとの接続が切れました。ページを開き直して同じ名前で入り直してください';conn=null;render()}});
-      setTimeout(go,8000);
-    };
-    go();
+  if(typeof mqtt=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
+  code=$('#cd').value.trim();const bi=+code[0];
+  if(code.length!=6||!BR[bi]){msg='部屋コードは6桁の数字です';render();return}
+  msg='接続中…';render();
+  conn(bi,c=>{
+    if(!c){msg='サーバーに接続できません。ネット接続を確認して、もう一度試してください';render();return}
+    cl=c;isHost=false;let got=false;
+    c.on('message',(t,p)=>{
+      let m;try{m=JSON.parse(p.toString())}catch(e){return}
+      if(m.t=='x'){closeLocal('ホストが退出したため部屋が閉じました');return}
+      if(!m.S||(!got&&Date.now()-m.ts>60000))return;
+      if(!got)lg('部屋の状態を受信');
+      got=true;S=m.S;msg='';render();
+    });
+    c.subscribe(top('s'),{qos:1},()=>pub('a',{t:'join',name:myName}));
+    setTimeout(()=>{if(!got){msg='その部屋コードは見つかりません。コードと、ホストが部屋を開いたままか確認してください';render()}},8000);
   });
-  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
-  peer.on('error',e=>{lg('error '+e.type);msg=e.type=='peer-unavailable'?'その部屋コードは見つかりません':'エラー: '+e.type;render()});
 }
 function leave(){
   if(!confirm('退出しますか？'))return;
-  if(isHost){conns.forEach(c=>{try{c.open&&c.send({t:'x'})}catch(e){}});const p=peer;setTimeout(()=>{try{p.destroy()}catch(e){}},300);isHost=false;conns=[]}
-  else{send({t:'leave',name:myName});const p=peer;conn=null;setTimeout(()=>{try{p.destroy()}catch(e){}},300)}
-  peer=null;S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg='退出しました';sel=new Set();render();
+  const c=cl,t=top('s'),h=isHost;
+  if(h)pub('s',{t:'x'});else send({t:'leave',name:myName});
+  setTimeout(()=>{try{if(h)c.publish(t,'',{qos:1,retain:true});c.end()}catch(e){}},600);
+  cl=null;isHost=false;clearInterval(hb);
+  S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg='退出しました';sel=new Set();render();
 }
 const act2=(a)=>send({t:'act',name:myName,a,n:a=='raise'?$('#rz').value:0});
 function drawOK(){send({t:'draw',name:myName,d:[...sel].sort()});sel=new Set()}
@@ -167,9 +187,10 @@ function render(){
   const A=$('#app'),M=msg?`<p class="mu">${esc(msg)}</p>`:'',P=S.players,i=P.indexOf(myName);
   $('#lv').style.display=(i>=0&&!left)?'block':'none';
   if(i<0||left){
-    A.innerHTML=`<div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
+    A.innerHTML=`<p class="mu" style="margin:0 0 8px">3人ポーカー（5枚ドロー・ベットあり）　バージョン ${VER}</p>
+<div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
 <button class="b" onclick="host()">部屋を作る</button></div>
-<div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（4桁）">
+<div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（6桁）">
 <button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}`;return;
   }
   const codeBox=isHost?`<div class="box"><h2>部屋コード</h2><div class="code">${esc(code)}</div></div>`:'';
