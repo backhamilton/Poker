@@ -105,21 +105,31 @@ function host(){
   setTimeout(()=>{if(!isHost){msg='サーバーに接続できません。ネット接続を確認して、Chromeで開き直してください';render()}},12000);
   peer=new Peer('pinepk-'+code);
   peer.on('open',()=>{isHost=true;msg='';S={seed:Math.random()*1e6|0,players:[],hist:[],H:null,ante:10};apply({t:'join',name:myName})});
-  peer.on('connection',c=>{conns.push(c);c.on('open',()=>c.send({t:'s',S}));c.on('data',apply)});
+  peer.on('connection',c=>{conns.push(c);c.on('close',()=>{conns=conns.filter(x=>x!==c)});c.on('open',()=>c.send({t:'s',S}));c.on('data',apply)});
   peer.on('error',e=>{msg='エラー: '+e.type+'（もう一度試してください）';render()});
+  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
 }
 function joinRoom(){
   if(!name())return;
   if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
   code=$('#cd').value.trim();msg='接続中…';render();
-  setTimeout(()=>{if(!(conn&&conn.open)&&!S.players.length){msg='接続できません。部屋コードとネット接続を確認して、Chromeで開き直してください';render()}},12000);
   peer=new Peer();
   peer.on('open',()=>{
-    conn=peer.connect('pinepk-'+code,{serialization:'json'});
-    conn.on('open',()=>{msg='';conn.send({t:'join',name:myName})});
-    conn.on('data',m=>{if(m.t=='s'){S=m.S;render()}});
-    conn.on('close',()=>{msg='ホストとの接続が切れました。ページを開き直してください';conn=null;render()});
+    let n=0;
+    const go=()=>{
+      if(conn&&conn.open)return;
+      if(++n>4){msg='つながりません。ホストがChromeを開いたままか確認して、もう一度試してください';render();return}
+      msg='接続中…（'+n+'/4）';render();
+      if(conn)try{conn.close()}catch(e){}
+      const c=conn=peer.connect('pinepk-'+code,{serialization:'json',reliable:true});
+      c.on('open',()=>{msg='';c.send({t:'join',name:myName})});
+      c.on('data',m=>{if(m.t=='s'){S=m.S;render()}});
+      c.on('close',()=>{if(conn===c){msg='ホストとの接続が切れました。ページを開き直して同じ名前で入り直してください';conn=null;render()}});
+      setTimeout(go,8000);
+    };
+    go();
   });
+  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
   peer.on('error',e=>{msg=e.type=='peer-unavailable'?'その部屋コードは見つかりません':'エラー: '+e.type;render()});
 }
 const act2=(a)=>send({t:'act',name:myName,a,n:a=='raise'?$('#rz').value:0});
