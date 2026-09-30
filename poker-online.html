@@ -23,6 +23,7 @@ svg{width:100%;height:auto;display:block}
 </style></head><body><main>
 <h1>♠ 3人ポーカー（5枚ドロー・ベットあり）</h1>
 <div id="app"></div>
+<details><summary class="mu">接続ログ（つながらないとき見せてください）</summary><pre id="log" style="white-space:pre-wrap;font-size:12px"></pre></details>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -92,6 +93,8 @@ function apply(m){
 }
 
 // ---- 通信 ----
+const CFG={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
+const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let peer=null,isHost=false,conn=null,conns=[],myName='',code='',msg='',sel=new Set(),selK='';
 try{myName=localStorage.getItem('pk')||''}catch(e){}
 const bc=()=>conns.forEach(c=>c.open&&c.send({t:'s',S}));
@@ -103,26 +106,27 @@ function host(){
   if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
   code=String(1000+Math.random()*9000|0);msg='接続中…';render();
   setTimeout(()=>{if(!isHost){msg='サーバーに接続できません。ネット接続を確認して、Chromeで開き直してください';render()}},12000);
-  peer=new Peer('pinepk-'+code);
+  peer=new Peer('pinepk-'+code,CFG);lg('ホスト起動 '+code);
   peer.on('open',()=>{isHost=true;msg='';S={seed:Math.random()*1e6|0,players:[],hist:[],H:null,ante:10};apply({t:'join',name:myName})});
-  peer.on('connection',c=>{conns.push(c);c.on('close',()=>{conns=conns.filter(x=>x!==c)});c.on('open',()=>c.send({t:'s',S}));c.on('data',apply)});
-  peer.on('error',e=>{msg='エラー: '+e.type+'（もう一度試してください）';render()});
+  peer.on('connection',c=>{lg('着信 '+c.peer.slice(0,6));c.on('iceStateChanged',x=>lg('ICE(着信) '+x));c.on('error',x=>lg('conn error '+x));conns.push(c);c.on('close',()=>{conns=conns.filter(x=>x!==c)});c.on('open',()=>c.send({t:'s',S}));c.on('data',apply)});
+  peer.on('error',e=>{lg('host error '+e.type);msg='エラー: '+e.type+'（もう一度試してください）';render()});
   peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
 }
 function joinRoom(){
   if(!name())return;
   if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
   code=$('#cd').value.trim();msg='接続中…';render();
-  peer=new Peer();
+  peer=new Peer(undefined,CFG);
   peer.on('open',()=>{
-    let n=0;
+    lg('guest peer open');let n=0;
     const go=()=>{
       if(conn&&conn.open)return;
       if(++n>4){msg='つながりません。ホストがChromeを開いたままか確認して、もう一度試してください';render();return}
       msg='接続中…（'+n+'/4）';render();
       if(conn)try{conn.close()}catch(e){}
       const c=conn=peer.connect('pinepk-'+code,{serialization:'json',reliable:true});
-      c.on('open',()=>{msg='';c.send({t:'join',name:myName})});
+      c.on('iceStateChanged',x=>lg('ICE '+x));c.on('error',x=>lg('conn error '+x));
+      c.on('open',()=>{lg('接続OK');msg='';c.send({t:'join',name:myName})});
       c.on('data',m=>{if(m.t=='s'){S=m.S;render()}});
       c.on('close',()=>{if(conn===c){msg='ホストとの接続が切れました。ページを開き直して同じ名前で入り直してください';conn=null;render()}});
       setTimeout(go,8000);
@@ -130,7 +134,7 @@ function joinRoom(){
     go();
   });
   peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
-  peer.on('error',e=>{msg=e.type=='peer-unavailable'?'その部屋コードは見つかりません':'エラー: '+e.type;render()});
+  peer.on('error',e=>{lg('error '+e.type);msg=e.type=='peer-unavailable'?'その部屋コードは見つかりません':'エラー: '+e.type;render()});
 }
 const act2=(a)=>send({t:'act',name:myName,a,n:a=='raise'?$('#rz').value:0});
 function drawOK(){send({t:'draw',name:myName,d:[...sel].sort()});sel=new Set()}
