@@ -23,6 +23,7 @@ svg{width:100%;height:auto;display:block}
 </style></head><body><main>
 <h1>♠ 3人ポーカー（5枚ドロー・ベットあり）</h1>
 <div id="app"></div>
+<button id="lv" class="b g" style="display:none" onclick="leave()">退出する</button>
 <details><summary class="mu">接続ログ（つながらないとき見せてください）</summary><pre id="log" style="white-space:pre-wrap;font-size:12px"></pre></details>
 </main>
 <script>
@@ -50,6 +51,7 @@ let S={seed:1,players:[],hist:[],H:null,ante:10};
 const alive=H=>[0,1,2].filter(x=>!H.fold[x]);
 function hands(){const H=S.H,d=deck(H.r);return[0,1,2].map(i=>{const h=d.slice(i*5,i*5+5);(H.disc[i]||[]).forEach((j,k)=>h[j]=d[15+i*5+k]);return h})}
 function startGame(){
+  if((S.gone||[]).length){cleanup();bc();render();return}
   const a=Math.min(1000,Math.max(1,parseInt($('#an').value)||10));
   if(S.players.length<3)return;
   const r=S.hist.length+1;S.ante=a;
@@ -67,7 +69,7 @@ function adv(i){
   const H=S.H;
   if(alive(H).length==1)return endHand(0);
   for(let k=1;k<=2;k++){const j=(i+k)%3;if(!H.fold[j]&&!(H.acted[j]&&H.rb[j]==H.cb)){H.turn=j;return}}
-  if(H.phase=='bet1')H.phase='draw';else endHand(1);
+  if(H.phase=='bet1'){H.phase='bet2';H.rb=[0,0,0];H.cb=0;H.acted=[0,0,0];let t=(H.r-1)%3;while(H.fold[t])t=(t+1)%3;H.turn=t}else endHand(1);
 }
 function act(i,a,n){
   const H=S.H;
@@ -79,15 +81,18 @@ function act(i,a,n){
   }
   H.acted[i]=1;adv(i);
 }
+function cleanup(){S.players=S.players.filter(p=>!(S.gone||[]).includes(p));S.gone=[];S.hist=[];S.H=null}
 function apply(m){
-  if(m.t=='join'&&!S.players.includes(m.name)&&S.players.length<3)S.players.push(m.name);
+  if(m.t=='join'){if(!S.players.includes(m.name)&&S.players.length<3)S.players.push(m.name);S.gone=(S.gone||[]).filter(x=>x!=m.name)}
   const H=S.H,i=S.players.indexOf(m.name);
-  if(H&&i>=0&&!H.fold[i]){
-    if(m.t=='act'&&(H.phase=='bet1'||H.phase=='bet2')&&H.turn==i&&['call','raise','fold'].includes(m.a))act(i,m.a,m.n);
-    if(m.t=='draw'&&H.phase=='draw'&&H.disc[i]==null&&Array.isArray(m.d)){
-      H.disc[i]=m.d.slice(0,5);
-      if(alive(H).every(x=>H.disc[x]!=null)){H.phase='bet2';H.rb=[0,0,0];H.cb=0;H.acted=[0,0,0];let t=(H.r-1)%3;while(H.fold[t])t=(t+1)%3;H.turn=t}
-    }
+  if(m.t=='leave'&&i>=0){
+    S.gone=[...new Set([...(S.gone||[]),m.name])];
+    if(H&&H.phase!='end'){
+      if(!H.fold[i]){H.fold[i]=1;if(alive(H).length==1)endHand(0);else if(H.turn==i)adv(i)}
+    }else cleanup();
+  }else if(H&&i>=0&&!H.fold[i]){
+    if(m.t=='act'&&(H.phase=='bet1'||(H.phase=='bet2'&&H.disc[i]!=null))&&H.turn==i&&['call','raise','fold'].includes(m.a))act(i,m.a,m.n);
+    if(m.t=='draw'&&H.phase=='bet2'&&H.turn==i&&H.disc[i]==null&&Array.isArray(m.d))H.disc[i]=m.d.slice(0,5);
   }
   bc();render();
 }
@@ -95,12 +100,12 @@ function apply(m){
 // ---- 通信 ----
 const CFG={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
-let peer=null,isHost=false,conn=null,conns=[],myName='',code='',msg='',sel=new Set(),selK='';
+let left=false,peer=null,isHost=false,conn=null,conns=[],myName='',code='',msg='',sel=new Set(),selK='';
 try{myName=localStorage.getItem('pk')||''}catch(e){}
 const bc=()=>conns.forEach(c=>c.open&&c.send({t:'s',S}));
 const send=m=>isHost?apply(m):(conn&&conn.open&&conn.send(m));
 function name(){const n=$('#nm').value.trim().slice(0,12);if(!n){msg='名前を入れてください';render();return null}
-  myName=n;try{localStorage.setItem('pk',n)}catch(e){}return n}
+  myName=n;left=false;try{localStorage.setItem('pk',n)}catch(e){}return n}
 function host(){
   if(!name())return;
   if(typeof Peer=='undefined'){msg='通信ライブラリを読み込めませんでした。ファイルをChromeで開き直してください';render();return}
@@ -127,7 +132,7 @@ function joinRoom(){
       const c=conn=peer.connect('pinepk-'+code,{serialization:'json',reliable:true});
       c.on('iceStateChanged',x=>lg('ICE '+x));c.on('error',x=>lg('conn error '+x));
       c.on('open',()=>{lg('接続OK');msg='';c.send({t:'join',name:myName})});
-      c.on('data',m=>{if(m.t=='s'){S=m.S;render()}});
+      c.on('data',m=>{if(m.t=='x'){conn=null;S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg='ホストが退出したため部屋が閉じました';try{peer.destroy()}catch(e){}peer=null;render();return}if(m.t=='s'){S=m.S;render()}});
       c.on('close',()=>{if(conn===c){msg='ホストとの接続が切れました。ページを開き直して同じ名前で入り直してください';conn=null;render()}});
       setTimeout(go,8000);
     };
@@ -135,6 +140,12 @@ function joinRoom(){
   });
   peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
   peer.on('error',e=>{lg('error '+e.type);msg=e.type=='peer-unavailable'?'その部屋コードは見つかりません':'エラー: '+e.type;render()});
+}
+function leave(){
+  if(!confirm('退出しますか？'))return;
+  if(isHost){conns.forEach(c=>{try{c.open&&c.send({t:'x'})}catch(e){}});const p=peer;setTimeout(()=>{try{p.destroy()}catch(e){}},300);isHost=false;conns=[]}
+  else{send({t:'leave',name:myName});const p=peer;conn=null;setTimeout(()=>{try{p.destroy()}catch(e){}},300)}
+  peer=null;S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg='退出しました';sel=new Set();render();
 }
 const act2=(a)=>send({t:'act',name:myName,a,n:a=='raise'?$('#rz').value:0});
 function drawOK(){send({t:'draw',name:myName,d:[...sel].sort()});sel=new Set()}
@@ -154,7 +165,8 @@ const sg=v=>(v>0?'+':'')+v;
 const cards=(h,fn)=>'<div class="hand">'+h.map((c,j)=>`<button class="c ${rd(c)?'r':''} ${fn&&sel.has(j)?'s':''}" ${fn?`onclick="tog(${j})"`:'disabled'}>${cs(c)}</button>`).join('')+'</div>';
 function render(){
   const A=$('#app'),M=msg?`<p class="mu">${esc(msg)}</p>`:'',P=S.players,i=P.indexOf(myName);
-  if(i<0){
+  $('#lv').style.display=(i>=0&&!left)?'block':'none';
+  if(i<0||left){
     A.innerHTML=`<div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
 <button class="b" onclick="host()">部屋を作る</button></div>
 <div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（4桁）">
@@ -168,14 +180,14 @@ function render(){
     if(H){const R=H.res;
       h+=`<div class="box"><h2>ゲーム ${H.r} の結果${R.sd?'':'（フォールドで決着）'}</h2>`+P.map((p,k)=>`<div class="row"><span>${R.w.includes(k)?'🏆':''}${esc(p)} ${R.sd&&!H.fold[k]?R.hs[k].map(cs).join(' ')+' <span class="mu">'+HN[ev(R.hs[k])[0]]+'</span>':H.fold[k]?'<span class="mu">フォールド</span>':''}</span><b class="${R.dl[k]>=0?'pos':'neg'}">${sg(R.dl[k])}</b></div>`).join('')+'</div>';
     }
-    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2><input id="an" type="number" inputmode="numeric" value="${S.ante}"><button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button></div>`
+    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人がいます。続けるとその人は外れ、記録はリセットされます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}"><button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button></div>`
       :`<div class="box mu">ホストがゲームを始めるのを待っています…</div>`;
   }else{
-    const hs=hands(),myT=H.turn==i&&(H.phase=='bet1'||H.phase=='bet2');
-    const stage={bet1:'ベット①',draw:'カード交換',bet2:'ベット②'}[H.phase];
-    h+=`<div class="box"><h2>ゲーム ${H.r}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+P.map((p,k)=>`<div class="row"><span>${H.turn==k&&H.phase!='draw'?'▶':''}${esc(p)}${H.fold[k]?' <span class="mu">(フォールド)</span>':H.phase=='draw'&&H.disc[k]==null?' <span class="mu">交換中…</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+'</div>';
+    const hs=hands(),myT=H.turn==i&&(H.phase=='bet1'||H.disc[i]!=null);
+    const stage={bet1:'ベット①',bet2:'交換→ベット②'}[H.phase];
+    h+=`<div class="box"><h2>ゲーム ${H.r}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+P.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${H.fold[k]?' <span class="mu">(フォールド)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k].length+'枚交換</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+'</div>';
     const key=H.r+H.phase;if(selK!=key){sel=new Set();selK=key}
-    const canDraw=H.phase=='draw'&&!H.fold[i]&&H.disc[i]==null;
+    const canDraw=H.phase=='bet2'&&H.turn==i&&!H.fold[i]&&H.disc[i]==null;
     h+=`<div class="box"><h2>あなたの手札${H.fold[i]?'（フォールド済み）':''}</h2>${cards(hs[i],canDraw)}`;
     if(canDraw)h+=`<button class="b" onclick="drawOK()">${sel.size?sel.size+'枚交換する':'交換しない'}</button><p class="mu">交換したいカードをタップ</p>`;
     else if(!H.fold[i])h+=`<p class="mu">役: ${HN[ev(hs[i])[0]]}</p>`;
@@ -184,10 +196,10 @@ function render(){
 <button class="b" onclick="act2('raise')">${need?`コール${need}＋`:''}レイズ（上のぶんを上乗せ）</button>
 <button class="b g" onclick="act2('call')">${need?'コール '+need:'チェック'}</button>
 <button class="b x" onclick="act2('fold')">フォールド</button>`}
-    else if(H.phase!='draw')h+=`<p class="mu">${esc(P[H.turn])} の番です…</p>`;
+    else if(!canDraw)h+=`<p class="mu">${esc(P[H.turn])} の番です…</p>`;
     h+='</div>';
   }
-  if(S.hist.length)h+='<div class="box"><h2>チップ（マイナスあり）</h2>'+P.map((p,k)=>`<div class="row"><span>${esc(p)}</span><b class="${tot[k]>=0?'pos':'neg'}">${sg(tot[k])}</b></div>`).join('')+chart()+'</div>';
+  if(S.hist.length)h+='<div class="box"><h2>チップ（マイナスあり）</h2>'+P.map((p,k)=>`<div class="row"><span>${esc(p)}</span><b class="${tot[k]>=0?'pos':'neg'}">${sg(tot[k])}</b></div>`).join('')+(H&&H.phase=='end'&&H.res.sd?chart():'')+'</div>';
   A.innerHTML=h;
 }
 render();
