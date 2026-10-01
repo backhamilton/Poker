@@ -32,8 +32,10 @@ const SU=['♠','♥','♦','♣'],COL=['#2f6fed','#e8590c','#2b9a4f','#a020c0',
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cs=c=>SU[c/13|0]+({11:'J',12:'Q',13:'K',14:'A'}[c%13+2]||c%13+2);
 const rd=c=>[1,2].includes(c/13|0);
-function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function deck(r){const d=[...Array(52).keys()],f=rng(r*7919+S.seed);for(let i=51;i>0;i--){const j=f()*(i+1)|0;[d[i],d[j]]=[d[j],d[i]]}return d}
+const SEC={deck:[],hands:[],pos:0,pt:{},r:0};
+const rn=n=>{const a=new Uint32Array(1);if(typeof crypto!='undefined')crypto.getRandomValues(a);else a[0]=Math.random()*4294967296;return a[0]%n};
+const rid=()=>Array.from({length:16},()=>'abcdefghijklmnopqrstuvwxyz0123456789'[rn(36)]).join('');
+function shuf(){const d=[...Array(52).keys()];for(let i=51;i>0;i--){const j=rn(i+1);[d[i],d[j]]=[d[j],d[i]]}return d}
 function ev(h){
   const r=h.map(c=>c%13+2).sort((a,b)=>b-a),fl=h.every(c=>(c/13|0)==(h[0]/13|0)),n={};
   r.forEach(x=>n[x]=(n[x]||0)+1);
@@ -46,24 +48,28 @@ function ev(h){
 const cmp=(a,b)=>{for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]||0)-(b[i]||0);if(d)return d}return 0};
 
 // ---- ゲーム進行（ホストだけが実行）----
-let S={seed:1,players:[],hist:[],H:null,ante:10};
+let S={players:[],hist:[],H:null,ante:10};
 const alive=H=>[...Array(H.n).keys()].filter(x=>!H.fold[x]);
-function hands(){const H=S.H,d=deck(H.r);return[...Array(H.n).keys()].map(i=>{const h=d.slice(i*5,i*5+5);(H.disc[i]||[]).forEach((j,k)=>h[j]=d[H.n*5+i*5+k]);return h})}
+let MY=null,es2=null;
+function sendHand(i){const nm=S.players[i],pt=SEC.pt[nm];if(pt&&nm!=myName&&S.H)pub('c'+pt,{t:'h',r:S.H.r,h:SEC.hands[i]})}
+const myHand=(H,i)=>isHost?(SEC.r==H.r?SEC.hands[i]:null):(MY&&MY.r==H.r?MY.h:null);
 function startGame(){
   if((S.gone||[]).length)cleanup();
   const a=Math.max(1,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt($('#an').value)||10));
   const n=S.players.length;if(n<MIN){bc();render();return}
   const r=(S.hn||0)+1,z=v=>Array(n).fill(v);S.ante=a;
   S.H={r,n,ante:a,phase:'bet1',turn:(r-1)%n,pot:a*n,inv:z(a),rb:z(0),cb:0,acted:z(0),fold:z(0),disc:z(null)};
+  SEC.deck=shuf();SEC.r=r;SEC.hands=Array.from({length:n},(_,i)=>SEC.deck.slice(i*5,i*5+5));SEC.pos=n*5;
+  for(let i=0;i<n;i++)sendHand(i);
   bc();render();
 }
 function endHand(sd){
-  const H=S.H,al=alive(H),hs=hands();let w=al;
+  const H=S.H,al=alive(H),hs=SEC.hands;let w=al;
   if(sd&&al.length>1){const sc=hs.map(ev),b=al.reduce((m,i)=>cmp(sc[i],sc[m])>0?i:m,al[0]);w=al.filter(i=>!cmp(sc[i],sc[b]))}
   const dl=Array.from({length:H.n},(_,i)=>-H.inv[i]),sh=Math.floor(H.pot/w.length);
   w.forEach((i,k)=>dl[i]+=sh+(k?0:H.pot-sh*w.length));
   S.hist.push(Object.fromEntries(S.players.map((q,k)=>[q,dl[k]])));S.hn=(S.hn||0)+1;
-  if(S.hist.length>20){S.base=S.base||{};S.hist.splice(0,10).forEach(r=>{for(const n in r)S.base[n]=(S.base[n]||0)+r[n]})}H.phase='end';H.res={dl,w,sd:sd&&al.length>1,hs};
+  if(S.hist.length>20){S.base=S.base||{};S.hist.splice(0,10).forEach(r=>{for(const n in r)S.base[n]=(S.base[n]||0)+r[n]})}H.phase='end';H.res={dl,w,sd:sd&&al.length>1,hs:sd&&al.length>1?hs.map((h,k)=>H.fold[k]?null:h):null};
 }
 function adv(i){
   const H=S.H;
@@ -83,8 +89,10 @@ function act(i,a,n){
 }
 function cleanup(){S.players=S.players.filter(p=>!(S.gone||[]).includes(p));S.gone=[];S.H=null}
 function apply(m){
+  if(m.t=='join'&&m.pt&&/^[a-z0-9]{8,20}$/.test(m.pt))SEC.pt[m.name]=m.pt;
   if(m.t=='join'){if(!S.players.includes(m.name)&&S.players.length<MAX&&(!S.H||S.H.phase=='end'))S.players.push(m.name);S.gone=(S.gone||[]).filter(x=>x!=m.name);if(m.nonce)S.acks=[...(S.acks||[]),m.nonce].slice(-6)}
   const H=S.H,i=S.players.indexOf(m.name);
+  if(m.t=='join'&&H&&H.phase!='end'&&i>=0)sendHand(i);
   if(m.t=='leave'&&i>=0){
     S.gone=[...new Set([...(S.gone||[]),m.name])];
     if(H&&H.phase!='end'){
@@ -92,13 +100,13 @@ function apply(m){
     }else cleanup();
   }else if(H&&i>=0&&!H.fold[i]){
     if(m.t=='act'&&(H.phase=='bet1'||(H.phase=='bet2'&&H.disc[i]!=null))&&H.turn==i&&['call','raise','fold'].includes(m.a))act(i,m.a,m.n);
-    if(m.t=='draw'&&H.phase=='bet2'&&H.turn==i&&H.disc[i]==null&&Array.isArray(m.d))H.disc[i]=m.d.slice(0,5);
+    if(m.t=='draw'&&H.phase=='bet2'&&H.turn==i&&H.disc[i]==null&&Array.isArray(m.d)){const dd=[...new Set(m.d.filter(x=>Number.isInteger(x)&&x>=0&&x<5))].sort();dd.forEach(j=>SEC.hands[i][j]=SEC.deck[SEC.pos++]);H.disc[i]=dd.length;sendHand(i)}
   }
   bc();render();
 }
 
 // ---- 通信（ntfy.sh 経由・HTTPS/443。ホストが正）----
-const VER='2.3（2026-09-30・ntfy中継）';
+const VER='2.5（2026-09-30・ntfy中継）';
 const NT='https://ntfy.sh/';
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let left=false,es=null,isHost=false,myName='',code='',msg='',sel=new Set(),selK='',q=Promise.resolve();
@@ -119,14 +127,14 @@ function sub(k,since,onOpen,onMsg){
 }
 function name(){const n=$('#nm').value.trim().slice(0,12);if(!n){msg='名前を入れてください';render();return null}
   myName=n;left=false;try{localStorage.setItem('pk',n)}catch(e){}return n}
-function closeLocal(text){try{es&&es.close()}catch(e){}es=null;isHost=false;S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg=text;sel=new Set();render()}
+function closeLocal(text){try{es&&es.close();es2&&es2.close()}catch(e){}es=null;es2=null;MY=null;isHost=false;S={players:[],hist:[],H:null,ante:10};left=true;msg=text;sel=new Set();render()}
 function host(){
   if(!name())return;
   code=String(100000+Math.random()*900000|0);msg='接続中…';render();
   let ok=false;
   es=sub('a',null,()=>{
     if(ok)return;ok=true;isHost=true;msg='';
-    S={seed:Math.random()*1e6|0,players:[],hist:[],H:null,ante:10,hn:0};
+    S={players:[],hist:[],H:null,ante:10,hn:0};
     apply({t:'join',name:myName});lg('部屋 '+code);
   },m=>apply(m));
   setTimeout(()=>{if(!ok){msg='サーバーに接続できません。ネット接続を確認して、もう一度試してください';try{es.close()}catch(e){}es=null;render()}},10000);
@@ -136,8 +144,9 @@ function joinRoom(){
   code=$('#cd').value.trim();
   if(!/^\d{6}$/.test(code)){msg='部屋コードは6桁の数字です';render();return}
   msg='接続中…';render();
-  const nonce=Math.random().toString(36).slice(2,8);let got=false;
-  es=sub('s','latest',()=>{if(!got)pub('a',{t:'join',name:myName,nonce})},m=>{
+  const nonce=rid().slice(0,6),pt=rid();let got=false;MY=null;
+  es2=sub('c'+pt,'latest',null,m=>{if(m.t=='h'){MY={r:m.r,h:m.h};render()}});
+  es=sub('s','latest',()=>{if(!got)pub('a',{t:'join',name:myName,nonce,pt})},m=>{
     if(m.t=='x'){closeLocal('この部屋は閉じています（ホストが退出しました）');return}
     if(!m.S)return;
     if(!got){if(!(m.S.acks||[]).includes(nonce))return;got=true;lg('部屋に参加')}
@@ -148,9 +157,9 @@ function joinRoom(){
 function leave(){
   if(!confirm('退出しますか？'))return;
   if(isHost)pub('s',{t:'x'});else send({t:'leave',name:myName});
-  const e=es;setTimeout(()=>{try{e&&e.close()}catch(x){}},1500);
-  es=null;isHost=false;
-  S={seed:1,players:[],hist:[],H:null,ante:10};left=true;msg='退出しました';sel=new Set();render();
+  const e=es,e2=es2;setTimeout(()=>{try{e&&e.close();e2&&e2.close()}catch(x){}},1500);
+  es=null;es2=null;MY=null;isHost=false;
+  S={players:[],hist:[],H:null,ante:10};left=true;msg='退出しました';sel=new Set();render();
 }
 const act2=(a)=>send({t:'act',name:myName,a,n:a=='raise'?$('#rz').value:0});
 function drawOK(){send({t:'draw',name:myName,d:[...sel].sort()});sel=new Set()}
@@ -190,14 +199,14 @@ function render(){
     h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人がいます。続けるとその人は外れます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}">${P.length<MIN?'<p class="mu">'+MIN+'人以上そろうと始められます</p>':`<button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button>`}</div>`
       :`<div class="box mu">ホストがゲームを始めるのを待っています…</div>`;
   }else{
-    const hs=hands(),myT=H.turn==i&&(H.phase=='bet1'||H.disc[i]!=null);
+    const mh=myHand(H,i),myT=H.turn==i&&(H.phase=='bet1'||H.disc[i]!=null);
     const stage={bet1:'ベット①',bet2:'交換→ベット②'}[H.phase];
-    h+=`<div class="box"><h2>ゲーム ${H.r}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+P.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${H.fold[k]?' <span class="mu">(フォールド)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k].length+'枚交換</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+'</div>';
+    h+=`<div class="box"><h2>ゲーム ${H.r}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+P.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${H.fold[k]?' <span class="mu">(フォールド)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k]+'枚交換</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+'</div>';
     const key=H.r+H.phase;if(selK!=key){sel=new Set();selK=key}
-    const canDraw=H.phase=='bet2'&&H.turn==i&&!H.fold[i]&&H.disc[i]==null;
-    h+=`<div class="box"><h2>あなたの手札${H.fold[i]?'（フォールド済み）':''}</h2>${cards(hs[i],canDraw)}`;
+    const canDraw=H.phase=='bet2'&&H.turn==i&&!H.fold[i]&&H.disc[i]==null&&!!mh;
+    h+=`<div class="box"><h2>あなたの手札${H.fold[i]?'（フォールド済み）':''}</h2>${mh?cards(mh,canDraw):'<p class="mu">配札を待っています…</p>'}`;
     if(canDraw)h+=`<button class="b" onclick="drawOK()">${sel.size?sel.size+'枚交換する':'交換しない'}</button><p class="mu">交換したいカードをタップ</p>`;
-    else if(!H.fold[i])h+=`<p class="mu">役: ${HN[ev(hs[i])[0]]}</p>`;
+    else if(!H.fold[i]&&mh)h+=`<p class="mu">役: ${HN[ev(mh)[0]]}</p>`;
     if(myT){const need=H.cb-H.rb[i];
       h+=`<input id="rz" type="number" inputmode="numeric" value="${H.ante}">
 <button class="b" onclick="act2('raise')">${need?`コール${need}＋`:''}レイズ（上のぶんを上乗せ）</button>
