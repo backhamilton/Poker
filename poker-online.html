@@ -32,6 +32,8 @@ svg{width:100%;height:auto;display:block}
 <h2>初期チップ（全員一律）</h2>
 <input id="c0" type="number" inputmode="numeric" value="0">
 <button class="b" style="margin-top:0" onclick="setChips()">初期チップを反映する</button>
+<h2>持ち時間（時間切れは自動でフォールド）</h2>
+<select id="to" onchange="setTmo(this.value)"><option value="30">30秒</option><option value="60">60秒</option><option value="90">90秒</option><option value="120">2分</option><option value="180">3分</option><option value="0">なし（待ち続ける）</option></select>
 <h2>プレイヤーを退出させる</h2>
 <div id="kl"></div>
 </div>
@@ -71,6 +73,18 @@ const myPt=rid();
 function ks(pt,r,n){let h=2166136261;const t=pt+':'+r;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}const o=[];for(let i=0;i<n;i++){h=Math.imul(h^h>>>15,2246822507);h=Math.imul(h^h>>>13,3266489909);h^=h>>>16;o.push((h>>>0)%52)}return o}
 const encH=(c,pt,r)=>{const k=ks(pt,r,c.length);return c.map((x,i)=>(x+k[i])%52)};
 const decH=(c,pt,r)=>{const k=ks(pt,r,c.length);return c.map((x,i)=>(x-k[i]+52)%52)};
+// 番・段階・交換の状況が変わったら、その時刻から持ち時間を数え直す
+function syncT(){const H=S.H;if(!H||H.phase=='end')return;const k=H.r+'|'+H.phase+'|'+H.turn+'|'+H.disc[H.turn];if(SEC.tk!==k){SEC.tk=k;H.tAt=Date.now()}}
+let off=Infinity;
+function tmText(){const H=S.H;if(!H||H.phase=='end'||!(S.tmo>0)||!H.tAt||(!isHost&&!isFinite(off)))return'';const now=isHost?Date.now():Date.now()-off;return'残り '+Math.max(0,Math.ceil(S.tmo-(now-H.tAt)/1000))+'秒'}
+setInterval(()=>{
+  const e=$('#tm');if(e)e.textContent=tmText();
+  if(!isHost)return;const H=S.H;
+  if(!H||H.phase=='end'||!(S.tmo>0)||!H.tAt||Date.now()-H.tAt<(S.tmo+3)*1000)return; // 通信の遅れのぶん3秒だけ待つ
+  const i=H.turn,nm=S.players[i];H.to=[...(H.to||[]),i];lg(nm+' が時間切れ → フォールド');
+  if(nm==myName){H.fold[i]=1;H.acted[i]=1;if(alive(H).length==1)endHand(0);else adv(i);bc();render()}
+  else apply({t:'leave',name:nm}); // 反応がない人は退出扱い。画面を開いていれば自動で席に戻る
+},1000);
 function syncHx(){const H=S.H;if(!H)return;if(H.phase=='end'){delete H.hx;return}H.hx=S.players.slice(0,H.n).map((nm,i)=>{const pt=SEC.pt[nm];return pt&&nm!=myName?encH(SEC.hands[i],pt,H.r):null})}
 const myHand=(H,i)=>i<0||i>=H.n?null:isHost?(SEC.r==H.r?SEC.hands[i]:null):(H.hx&&H.hx[i]?decH(H.hx[i],myPt,H.r):null);
 function seat(){if((S.wait||[]).length){S.players.push(...S.wait);S.wait=[]}}
@@ -147,7 +161,7 @@ function apply(m){
 }
 
 // ---- 通信（ntfy.sh 経由・HTTPS/443。ホストが正）----
-const VER='3.1（2026-10-03）';
+const VER='3.3（2026-10-03）',VN=33; // VN: 通信のやり方の版。ホストと違うと手札が読めない
 const NT='https://ntfy.sh/';
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let left=false,es=null,isHost=false,myName='',code='',msg='',ner='',sel=new Set(),selK='',out=null,gen=0;
@@ -174,7 +188,7 @@ async function pump(){
   }
   busy=false;
 }
-const bc=()=>{if(!isHost)return;syncHx();S.v=(S.v||0)+1;pub('s',{S,ts:Date.now()})};
+const bc=()=>{if(!isHost)return;syncT();syncHx();S.v=(S.v||0)+1;pub('s',{S,ts:Date.now()})};
 const send=m=>isHost?apply(m):pub('a',m);
 // 受信: 切れたら自分でつなぎ直し、切れていた間の分も受け取る
 const SUBS=new Set();
@@ -215,7 +229,7 @@ function host(){
   let ok=false;
   es=sub('a',null,()=>{
     if(ok||g!=gen)return;ok=true;isHost=true;msg='';
-    S={players:[],hist:[],H:null,ante:10,hn:0};
+    S={players:[],hist:[],H:null,ante:10,hn:0,tmo:60,ver:VN};
     apply({t:'join',name:myName});lg('部屋 '+code);
   },m=>{if(g==gen&&ok)apply(m)});
   setTimeout(()=>{if(g==gen&&!ok){msg='サーバーに接続できません。ネット接続を確認して、もう一度試してください';try{es.close()}catch(e){}es=null;render()}},10000);
@@ -225,7 +239,7 @@ function joinRoom(){
   const c=$('#cd').value.trim();
   if(!/^\d{6}$/.test(c)){msg='部屋コードは6桁の数字です';render();return}
   const g=++gen;reset0();ner='';code=c;msg='接続中…';render();
-  const nonce=rid().slice(0,6),jm={t:'join',name:myName,nonce,pt:myPt};let got=false,jn=0;
+  const nonce=rid().slice(0,6),jm={t:'join',name:myName,nonce,pt:myPt};let got=false,jn=0,back=0;off=Infinity;
   es=sub('s','latest',()=>{if(g==gen&&!got)pub('a',jm)},m=>{
     if(g!=gen)return;
     if(m.t=='x'){closeLocal('この部屋は閉じています（ホストが退出しました）');return}
@@ -233,7 +247,11 @@ function joinRoom(){
     if(!got){if(!(m.S.acks||[]).includes(nonce))return;got=true;lg('部屋に参加')}
     else if(S.v!=null&&m.S.v!=null&&m.S.v<S.v)return;
     if((m.S.kicked||[]).includes(myName)){closeLocal('ホストに退出させられました。もう一度入るには、部屋コードを入れ直してください');return}
-    S=m.S;msg='';
+    S=m.S;msg=S.ver===VN?'':'ホストと版が違います（この画面は バージョン '+VER+'）。全員がページを再読み込みして、同じ版にそろえてください';
+    if(m.ts)off=Math.min(off,Date.now()-m.ts);
+    // 時間切れなどで外された扱いになっていても、画面を開いていれば自動で席に戻る
+    const me=S.players.includes(myName)||(S.wait||[]).includes(myName);
+    if(((S.gone||[]).includes(myName)||(!me&&S.players.length+(S.wait||[]).length<MAX))&&Date.now()-back>8000){back=Date.now();lg('席に戻ります');pub('a',jm)}
     if(out&&((S.sq||{})[myName]||0)>=out.m.q)out=null;
     render();
   });
@@ -249,6 +267,7 @@ function leave(){
 let mo=false;
 function togMenu(){mo=!mo;if(mo)$('#c0').value=S.chips0||0;render()}
 function setMode(v){if(!isHost)return;S.mode=v=='holdem'?'holdem':'draw';bc();render()}
+function setTmo(v){if(!isHost)return;v=parseInt(v);S.tmo=Number.isFinite(v)&&v>0?Math.min(3600,v):0;bc();render()}
 function setChips(){if(!isHost)return;const v=parseInt($('#c0').value);S.chips0=Number.isFinite(v)?Math.max(-9e12,Math.min(9e12,v)):0;msg='初期チップを '+S.chips0+' にしました';bc();render()}
 function kick(k){
   const nm=[...S.players,...(S.wait||[])][k];if(!isHost||nm==null||nm==myName)return;
@@ -271,22 +290,29 @@ function chart(){
   return s+'</svg>'+S.players.map((p,i)=>`<span style="color:${COL[i]}">● ${esc(p)}</span> `).join('');
 }
 const sg=v=>(v>0?'+':'')+v;
+function setApp(h){
+  const A=$('#app'),old={},ae=document.activeElement,fid=ae&&ae.id;
+  A.querySelectorAll('input').forEach(e=>{if(e.id)old[e.id]=e.value});
+  A.innerHTML=h;
+  A.querySelectorAll('input').forEach(e=>{if(e.id in old)e.value=old[e.id]});
+  if(fid&&fid in old){const e=$('#'+fid);if(e&&e!==document.activeElement)try{e.focus()}catch(x){}}
+}
 const rl=c=>c.length>=5?HN[best(c)[0]]:(c.length==2&&c[0]%13==c[1]%13?'ワンペア':'ハイカード');
 const cards=(h,click,hl)=>'<div class="hand">'+h.map((c,j)=>`<button class="c ${rd(c)?'r':''} ${hl&&sel.has(j)?'s':''}" ${click?`onclick="tog(${j})"`:'disabled'}>${cs(c)}</button>`).join('')+'</div>';
 function render(){
   const A=$('#app'),M=(ner?`<p class="neg">${esc(ner)}</p>`:'')+(msg?`<p class="mu">${esc(msg)}</p>`:''),P=S.players,W=S.wait||[],i=P.indexOf(myName),wt=W.includes(myName),inRoom=(i>=0||wt)&&!left;
   $('#lv').style.display=inRoom?'block':'none';
-  $('#rg').style.display=inRoom?'block':'none';$('#rg').textContent=inRoom?'部屋コード '+code+'　｜　今日この端末から送った数（目安） '+cnt(0)+' / 250':'';
+  $('#rg').style.display=inRoom?'block':'none';$('#rg').textContent=inRoom?'部屋コード '+code+'　｜　今日この端末から送った数（目安） '+cnt(0)+' / 250　｜　バージョン '+VER.slice(0,3):'';
   const hostIn=isHost&&i>=0&&!left,gn=S.gone||[];
   $('#mb').style.display=hostIn?'block':'none';$('#mn').style.display=hostIn&&mo?'block':'none';
-  if(hostIn){$('#rc').textContent=code;$('#md').value=S.mode||'draw';
+  if(hostIn){$('#rc').textContent=code;$('#md').value=S.mode||'draw';$('#to').value=String(S.tmo||0);
     $('#kl').innerHTML=[...P,...W].map((p,k)=>p==myName?'':`<div class="row" style="align-items:center;padding:4px 0"><span>${esc(p)}${W.includes(p)?' <span class="mu">(待機中)</span>':''}</span>${gn.includes(p)?'<span class="mu">退出済み</span>':`<button class="b x k" onclick="kick(${k})">退出させる</button>`}</div>`).join('')||'<p class="mu" style="margin:0">ほかのプレイヤーはいません</p>'}
   if(!inRoom){
-    A.innerHTML=`<p class="mu" style="margin:0 0 8px">ポーカー（5枚ドロー／テキサスホールデム・2〜5人）　バージョン ${VER}</p>
+    setApp(`<p class="mu" style="margin:0 0 8px">ポーカー（5枚ドロー／テキサスホールデム・2〜5人）　バージョン ${VER}</p>
 <div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
 <button class="b" onclick="host()">部屋を作る</button></div>
 <div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（6桁）">
-<button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}${!left&&P.length&&P.length+W.length>=MAX?'<p class="mu">満席です（'+MAX+'人まで）。</p>':''}`;return;
+<button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}${!left&&P.length&&P.length+W.length>=MAX?'<p class="mu">満席です（'+MAX+'人まで）。</p>':''}`);return;
   }
   const codeBox=isHost?`<div class="box"><h2>部屋コード</h2><div class="code">${esc(code)}</div></div>`:'';
   const H=S.H;let h=M;
@@ -297,19 +323,19 @@ function render(){
       h+=`<div class="box"><h2>ゲーム ${H.r} の結果${R.sd?'':'（フォールドで決着）'}</h2>${H.board&&H.board.length?'<p class="mu" style="margin:0 0 6px">場: '+H.board.map(cs).join(' ')+'</p>':''}`+P.slice(0,H.n).map((p,k)=>`<div class="row"><span>${R.w.includes(k)?'🏆':''}${esc(p)} ${R.hs&&R.hs[k]?R.hs[k].map(cs).join(' ')+' <span class="mu">'+rl(R.hs[k].concat(H.board||[]))+(H.fold[k]?'（フォールド）':'')+'</span>':H.fold[k]?'<span class="mu">フォールド</span>':''}</span><b class="${R.dl[k]>=0?'pos':'neg'}">${sg(R.dl[k])}</b></div>`).join('')+'</div>';
     }
     h+=`<div class="box"><h2>参加中（${P.length}/${MAX}人・${MIN}人から開始）</h2>${P.map(esc).join('、')}<p class="mu" style="margin:6px 0 0">次のゲーム: ${MN[S.mode||'draw']}${isHost?'（メニューで変更）':''}</p></div>`;
-    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人がいます。続けるとその人は外れます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}">${P.length<MIN?'<p class="mu">'+MIN+'人以上そろうと始められます</p>':`<button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button>`}</div>`
+    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人・時間切れのまま戻っていない人がいます。続けるとその人は外れます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}">${P.length<MIN?'<p class="mu">'+MIN+'人以上そろうと始められます</p>':`<button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button>`}</div>`
       :`<div class="box mu">ホストがゲームを始めるのを待っています…</div>`;
   }else{
     const hd=H.mode=='holdem',PL=P.slice(0,H.n);
     const stage={bet1:'ベット①',bet2:'交換→ベット②',pre:'プリフロップ',flop:'フロップ',turn:'ターン',river:'リバー'}[H.phase];
-    h+=`<div class="box"><h2>ゲーム ${H.r}｜${MN[H.mode||'draw']}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+PL.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${gn.includes(p)?' <span class="mu">(退出)</span>':H.fold[k]?' <span class="mu">(フォールド)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k]+'枚交換</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+(W.length?`<p class="mu" style="margin:6px 0 0">次のゲームから参加: ${W.map(esc).join('、')}</p>`:'')+'</div>';
+    h+=`<div class="box"><h2>ゲーム ${H.r}｜${MN[H.mode||'draw']}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+PL.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${(H.to||[]).includes(k)?' <span class="mu">(時間切れ)</span>':gn.includes(p)?' <span class="mu">(退出)</span>':H.fold[k]?' <span class="mu">(フォールド)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k]+'枚交換</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+(S.tmo>0?`<p class="mu" style="margin:6px 0 0">${esc(P[H.turn])} の番｜<b id="tm">${tmText()}</b>（時間切れは自動でフォールド）</p>`:'')+(W.length?`<p class="mu" style="margin:6px 0 0">次のゲームから参加: ${W.map(esc).join('、')}</p>`:'')+'</div>';
     if(hd)h+=`<div class="box"><h2>場のカード</h2><div class="hand">${[0,1,2,3,4].map(j=>H.board[j]!=null?`<div class="c ${rd(H.board[j])?'r':''}">${cs(H.board[j])}</div>`:'<div class="c" style="opacity:.35">?</div>').join('')}</div></div>`;
     if(wt)h+='<div class="box">いまのゲームが終わったら参加します。このままお待ちください。</div>';
     else{
       const mh=myHand(H,i),pd=!!out,myT=H.turn==i&&!H.fold[i]&&(hd||H.phase=='bet1'||H.disc[i]!=null);
       const key=H.r+H.phase;if(selK!=key){sel=new Set();selK=key}
       const canDraw=!hd&&H.phase=='bet2'&&H.turn==i&&!H.fold[i]&&H.disc[i]==null&&!!mh;
-      h+=`<div class="box"><h2>あなたの手札${H.fold[i]?'（フォールド済み）':''}</h2>${mh?cards(mh,canDraw&&!pd,canDraw):'<p class="mu">手札を読み込めません。ページを開き直して、同じ名前で入り直してください</p>'}`;
+      h+=`<div class="box"><h2>あなたの手札${H.fold[i]?'（フォールド済み）':''}</h2>${mh?cards(mh,canDraw&&!pd,canDraw):'<p class="mu">手札を読み込めません。全員がページを再読み込みして同じ版（いま バージョン '+VER.slice(0,3)+'）にそろえ、同じ名前で入り直してください</p>'}`;
       if(!canDraw&&!H.fold[i]&&mh)h+=`<p class="mu">役: ${rl(mh.concat(H.board||[]))}</p>`;
       if(pd&&(canDraw||myT))h+='<p class="mu">送信中…</p>';
       else if(canDraw)h+=`<button class="b" onclick="drawOK()">${sel.size?sel.size+'枚交換する':'交換しない'}</button><p class="mu">交換したいカードをタップ</p>`;
@@ -323,7 +349,7 @@ function render(){
     }
   }
   if(S.hist.length||c0)h+='<div class="box"><h2>チップ（マイナスあり）'+(c0?'｜初期 '+c0:'')+'</h2>'+P.map((p,k)=>`<div class="row"><span>${esc(p)}</span><b class="${tot[k]>=c0?'pos':'neg'}">${c0?tot[k]:sg(tot[k])}</b></div>`).join('')+(H&&H.phase=='end'&&H.res.sd?chart():'')+'</div>';
-  A.innerHTML=h;
+  setApp(h);
 }
 render();
 </script></body></html>
