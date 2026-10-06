@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ポーカー（2〜5人）</title>
+<title>ポーカー（2〜10人）</title>
 <style>
-:root{--bg:#f6f7f9;--fg:#1a1c20;--cd:#fff;--ac:#2f6fed;--mu:#6b7280;--rd:#d33}
-@media(prefers-color-scheme:dark){:root{--bg:#15171b;--fg:#eceef2;--cd:#22252b;--ac:#6c9bff;--mu:#9aa1ad;--rd:#ff7b7b}}
+:root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;--bg:#f6f7f9;--fg:#1a1c20;--cd:#fff;--ac:#2f6fed;--mu:#6b7280;--rd:#d33}
+@media(prefers-color-scheme:dark){:root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;--bg:#15171b;--fg:#eceef2;--cd:#22252b;--ac:#6c9bff;--mu:#9aa1ad;--rd:#ff7b7b}}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans JP",sans-serif}
 main{max-width:480px;margin:0 auto;padding:16px}
 h1{font-size:20px;margin:0 0 12px}h2{font-size:15px;margin:0 0 8px;color:var(--mu)}
@@ -14,7 +14,7 @@ h1{font-size:20px;margin:0 0 12px}h2{font-size:15px;margin:0 0 8px;color:var(--m
 .c.r{color:var(--rd)}.c.s{border-color:var(--ac);transform:translateY(-6px)}
 button.b,input,select{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid var(--mu);background:var(--cd);color:var(--fg);box-sizing:border-box}
 button.b{background:var(--ac);color:#fff;border:0;width:100%;margin-top:8px}
-button.g{background:var(--mu)}button.x{background:var(--rd)}
+button.g{background:var(--mu)}button.a{background:#b45309}button.x{background:var(--rd)}
 input,select{width:100%;margin-bottom:6px}
 button.k{width:auto;margin:0;padding:6px 12px}
 #mn h2{margin-top:10px}#mn h2:first-child{margin-top:0}
@@ -22,7 +22,7 @@ button.k{width:auto;margin:0;padding:6px 12px}
 .code{font-size:32px;font-weight:700;letter-spacing:6px;text-align:center}
 svg{width:100%;height:auto;display:block}
 </style></head><body><main>
-<h1>♠ ポーカー（2〜5人）</h1>
+<h1>♠ ポーカー（2〜10人）</h1>
 <button id="mb" class="b g" style="display:none;margin:0 0 12px" onclick="togMenu()">☰ メニュー（ホスト用）</button>
 <div id="mn" class="box" style="display:none">
 <h2>部屋コード（ゲームの途中でも入れます）</h2>
@@ -45,14 +45,17 @@ svg{width:100%;height:auto;display:block}
 <script>
 const $=s=>document.querySelector(s);
 const HN=["ハイカード","ワンペア","ツーペア","スリーカード","ストレート","フラッシュ","フルハウス","フォーカード","ストレートフラッシュ"];
-const SU=['♠','♥','♦','♣'],COL=['#2f6fed','#e8590c','#2b9a4f','#a020c0','#c9a800'],MIN=2,MAX=5;
+const SU=['♠','♥','♦','♣'],MIN=2,MAX=10,MAXD=6;
+// グラフの線: 8色を決まった順に使い、9人目からは同じ色の破線にする
+const COL=k=>'var(--s'+(k%8+1)+')',DASH=k=>k>=8?'stroke-dasharray="5 4"':'';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cs=c=>SU[c/13|0]+({11:'J',12:'Q',13:'K',14:'A'}[c%13+2]||c%13+2);
 const rd=c=>[1,2].includes(c/13|0);
 const SEC={deck:[],hands:[],pos:0,pt:{},r:0};
 const rn=n=>{const a=new Uint32Array(1);if(typeof crypto!='undefined')crypto.getRandomValues(a);else a[0]=Math.random()*4294967296;return a[0]%n};
 const rid=()=>Array.from({length:16},()=>'abcdefghijklmnopqrstuvwxyz0123456789'[rn(36)]).join('');
-function shuf(){const d=[...Array(52).keys()];for(let i=51;i>0;i--){const j=rn(i+1);[d[i],d[j]]=[d[j],d[i]]}return d}
+function shufA(d){for(let i=d.length-1;i>0;i--){const j=rn(i+1);[d[i],d[j]]=[d[j],d[i]]}return d}
+const shuf=()=>shufA([...Array(52).keys()]);
 function ev(h){
   const r=h.map(c=>c%13+2).sort((a,b)=>b-a),fl=h.every(c=>(c/13|0)==(h[0]/13|0)),n={};
   r.forEach(x=>n[x]=(n[x]||0)+1);
@@ -68,6 +71,9 @@ const cmp=(a,b)=>{for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]||
 
 // ---- ゲーム進行（ホストだけが実行）----
 let S={players:[],hist:[],H:null,ante:10};
+const ridx=nm=>(S.ro||[]).indexOf(nm);
+function chips(nm){const k=ridx(nm);return(S.chips0||0)+(k<0?0:((S.base||[])[k]||0)+S.hist.reduce((t,r)=>t+(r[k]||0),0))}
+function toBase(r){const b=S.base=S.base||[];r.forEach((v,k)=>{b[k]=(b[k]||0)+v})}
 const alive=H=>[...Array(H.n).keys()].filter(x=>!H.fold[x]);
 const myPt=rid();
 function ks(pt,r,n){let h=2166136261;const t=pt+':'+r;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}const o=[];for(let i=0;i<n;i++){h=Math.imul(h^h>>>15,2246822507);h=Math.imul(h^h>>>13,3266489909);h^=h>>>16;o.push((h>>>0)%52)}return o}
@@ -94,10 +100,11 @@ function startGame(){
   seat();
   const a=Math.max(1,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt($('#an').value)||10));
   const n=S.players.length;if(n<MIN){bc();render();return}
+  if(S.mode!='holdem'&&n>MAXD){msg='5枚ドローは'+MAXD+'人までです。メニューでテキサスホールデムに切り替えてください';bc();render();return}
   const r=(S.hn||0)+1,z=v=>Array(n).fill(v),mode=S.mode=='holdem'?'holdem':'draw',hc=mode=='holdem'?2:5;S.ante=a;
   S.H={r,n,mode,ante:a,phase:mode=='holdem'?'pre':'bet1',turn:(r-1)%n,pot:a*n,inv:z(a),rb:z(0),cb:0,acted:z(0),fold:z(0),disc:z(null)};
   if(mode=='holdem')S.H.board=[];
-  SEC.deck=shuf();SEC.r=r;SEC.hands=Array.from({length:n},(_,i)=>SEC.deck.slice(i*hc,i*hc+hc));SEC.pos=n*hc;
+  SEC.deck=shuf();SEC.r=r;SEC.hands=Array.from({length:n},(_,i)=>SEC.deck.slice(i*hc,i*hc+hc));SEC.pos=n*hc;SEC.dis=[];
   bc();render();
 }
 function endHand(sd){
@@ -105,12 +112,14 @@ function endHand(sd){
   if(sd&&al.length>1){const sc=hs.map(h=>best(h.concat(H.board||[]))),b=al.reduce((m,i)=>cmp(sc[i],sc[m])>0?i:m,al[0]);w=al.filter(i=>!cmp(sc[i],sc[b]))}
   const dl=Array.from({length:H.n},(_,i)=>-H.inv[i]),sh=Math.floor(H.pot/w.length);
   w.forEach((i,k)=>dl[i]+=sh+(k?0:H.pot-sh*w.length));
-  S.hist.push(Object.fromEntries(S.players.map((q,k)=>[q,dl[k]])));S.hn=(S.hn||0)+1;
-  if(S.hist.length>20){S.base=S.base||{};S.hist.splice(0,10).forEach(r=>{for(const n in r)S.base[n]=(S.base[n]||0)+r[n]})}H.phase='end';H.res={dl,w,sd:sd&&al.length>1,hs:hs.map(h=>h.slice())};
+  const ro=S.ro=S.ro||[],e=[];S.players.slice(0,H.n).forEach((q,k)=>{let x=ro.indexOf(q);if(x<0)x=ro.push(q)-1;e[x]=dl[k]});for(let x=0;x<ro.length;x++)if(e[x]==null)e[x]=0;
+  S.hist.push(e);S.hn=(S.hn||0)+1;
+  if(S.hist.length>20)S.hist.splice(0,10).forEach(toBase);
+  H.phase='end';H.res={dl,w,sd:sd&&al.length>1,hs:hs.map(h=>h.slice())};
   seat();
   // 中継サービスは1通4KBまで。大きくなったら古い記録から合計にまとめる
   const big=()=>{const t=JSON.stringify({S,ts:Date.now()});return(typeof TextEncoder!='undefined'?new TextEncoder().encode(t).length:t.length*3)>3000};
-  while(S.hist.length>1&&big()){S.base=S.base||{};const r0=S.hist.shift();for(const n in r0)S.base[n]=(S.base[n]||0)+r0[n]}
+  while(S.hist.length>1&&big())toBase(S.hist.shift());
 }
 function adv(i){
   const H=S.H;
@@ -125,7 +134,8 @@ function act(i,a,n){
   if(a=='fold')H.fold[i]=1;
   else{
     let put=H.cb-H.rb[i];
-    if(a=='raise'){n=Math.max(H.ante,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0)}
+    if(a=='allin'){const r=chips(S.players[i])-H.inv[i]-put;if(r<=0)return;put+=r;H.cb+=r;H.acted=Array(H.n).fill(0);H.ai=[...(H.ai||[]),i]}
+    else if(a=='raise'){n=Math.max(H.ante,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0)}
     H.rb[i]+=put;H.inv[i]+=put;H.pot+=put;
   }
   H.acted[i]=1;adv(i);
@@ -153,15 +163,15 @@ function apply(m){
       if(i<H.n&&!H.fold[i]){H.fold[i]=1;if(alive(H).length==1)endHand(0);else if(H.turn==i)adv(i)}
     }else cleanup();
   }else if(H&&H.phase!='end'&&i>=0&&i<H.n&&!H.fold[i]){
-    if(m.t=='act'&&(H.mode=='holdem'||H.phase=='bet1'||(H.phase=='bet2'&&H.disc[i]!=null))&&H.turn==i&&['call','raise','fold'].includes(m.a))act(i,m.a,m.n);
-    if(m.t=='draw'&&H.mode!='holdem'&&H.phase=='bet2'&&H.turn==i&&H.disc[i]==null&&Array.isArray(m.d)){const dd=[...new Set(m.d.filter(x=>Number.isInteger(x)&&x>=0&&x<5))].sort();dd.forEach(j=>SEC.hands[i][j]=SEC.deck[SEC.pos++]);H.disc[i]=dd.length}
+    if(m.t=='act'&&(H.mode=='holdem'||H.phase=='bet1'||(H.phase=='bet2'&&H.disc[i]!=null))&&H.turn==i&&['call','raise','fold','allin'].includes(m.a))act(i,m.a,m.n);
+    if(m.t=='draw'&&H.mode!='holdem'&&H.phase=='bet2'&&H.turn==i&&H.disc[i]==null&&Array.isArray(m.d)){const dd=[...new Set(m.d.filter(x=>Number.isInteger(x)&&x>=0&&x<5))].sort();const oc=[];dd.forEach(j=>{if(SEC.pos>=SEC.deck.length){if(!SEC.dis.length)return;SEC.deck=shufA(SEC.dis);SEC.dis=[];SEC.pos=0}oc.push(SEC.hands[i][j]);SEC.hands[i][j]=SEC.deck[SEC.pos++]});SEC.dis.push(...oc);H.disc[i]=oc.length}
   }
   if(force||JSON.stringify(S)!==before)bc();
   render();
 }
 
 // ---- 通信（ntfy.sh 経由・HTTPS/443。ホストが正）----
-const VER='3.3（2026-10-03）',VN=33; // VN: 通信のやり方の版。ホストと違うと手札が読めない
+const VER='3.4（2026-10-06）',VN=34; // VN: 通信のやり方の版。ホストと違うと手札が読めない
 const NT='https://ntfy.sh/';
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let left=false,es=null,isHost=false,myName='',code='',msg='',ner='',sel=new Set(),selK='',out=null,gen=0;
@@ -276,18 +286,19 @@ function kick(k){
   apply({t:'leave',name:nm});
 }
 const act2=(a)=>sendAct({t:'act',name:myName,a,n:a=='raise'?$('#rz').value:0});
+function allIn(){if(confirm('オールインしますか？（持ちチップを全部賭けます）'))sendAct({t:'act',name:myName,a:'allin'})}
 function drawOK(){sendAct({t:'draw',name:myName,d:[...sel].sort()})}
 function tog(i){sel.has(i)?sel.delete(i):sel.add(i);render()}
 
 // ---- 表示 ----
 function chart(){
   const n=S.hist.length;if(!n)return'';
-  const c0=S.chips0||0,ser=S.players.map(q=>{let s=c0+((S.base||{})[q]||0);return[s,...S.hist.map(r=>s+=(r[q]||0))]});
+  const c0=S.chips0||0,ser=S.players.map(q=>{const k=ridx(q);let s=c0+(k<0?0:(S.base||[])[k]||0);return[s,...S.hist.map(r=>s+=(k<0?0:r[k]||0))]});
   const all=ser.flat(),mn=Math.min(...all,c0),mx=Math.max(...all,c0),sp=(mx-mn)||1;
   const X=i=>10+i/n*280,Y=v=>10+(mx-v)/sp*110;
   let s=`<svg viewBox="0 0 300 130"><line x1="10" x2="290" y1="${Y(c0)}" y2="${Y(c0)}" stroke="currentColor" opacity=".3"/>`;
-  ser.forEach((a,i)=>s+=`<polyline fill="none" stroke="${COL[i]}" stroke-width="2.5" points="${a.map((v,j)=>X(j)+','+Y(v)).join(' ')}"/>`);
-  return s+'</svg>'+S.players.map((p,i)=>`<span style="color:${COL[i]}">● ${esc(p)}</span> `).join('');
+  ser.forEach((a,i)=>s+=`<polyline fill="none" stroke="${COL(i)}" stroke-width="2" stroke-linejoin="round" ${DASH(i)} points="${a.map((v,j)=>X(j)+','+Y(v)).join(' ')}"/>`);
+  return s+'</svg><div style="font-size:13px;margin-top:4px">'+S.players.map((p,i)=>`<span style="white-space:nowrap;margin-right:10px"><svg viewBox="0 0 18 8" style="display:inline-block;width:18px;height:8px;vertical-align:middle"><line x1="0" y1="4" x2="18" y2="4" stroke="${COL(i)}" stroke-width="3" ${DASH(i)}/></svg> ${esc(p)}</span>`).join(' ')+'</div>';
 }
 const sg=v=>(v>0?'+':'')+v;
 function setApp(h){
@@ -308,7 +319,7 @@ function render(){
   if(hostIn){$('#rc').textContent=code;$('#md').value=S.mode||'draw';$('#to').value=String(S.tmo||0);
     $('#kl').innerHTML=[...P,...W].map((p,k)=>p==myName?'':`<div class="row" style="align-items:center;padding:4px 0"><span>${esc(p)}${W.includes(p)?' <span class="mu">(待機中)</span>':''}</span>${gn.includes(p)?'<span class="mu">退出済み</span>':`<button class="b x k" onclick="kick(${k})">退出させる</button>`}</div>`).join('')||'<p class="mu" style="margin:0">ほかのプレイヤーはいません</p>'}
   if(!inRoom){
-    setApp(`<p class="mu" style="margin:0 0 8px">ポーカー（5枚ドロー／テキサスホールデム・2〜5人）　バージョン ${VER}</p>
+    setApp(`<p class="mu" style="margin:0 0 8px">ポーカー（テキサスホールデム 2〜10人／5枚ドロー 2〜6人）　バージョン ${VER}</p>
 <div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
 <button class="b" onclick="host()">部屋を作る</button></div>
 <div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（6桁）">
@@ -316,19 +327,19 @@ function render(){
   }
   const codeBox=isHost?`<div class="box"><h2>部屋コード</h2><div class="code">${esc(code)}</div></div>`:'';
   const H=S.H;let h=M;
-  const c0=S.chips0||0,tot=P.map(q=>c0+((S.base||{})[q]||0)+S.hist.reduce((s,r)=>s+(r[q]||0),0));
+  const c0=S.chips0||0,tot=P.map(chips);
   if(!H||H.phase=='end'){
     h=codeBox+h;
     if(H){const R=H.res;
       h+=`<div class="box"><h2>ゲーム ${H.r} の結果${R.sd?'':'（フォールドで決着）'}</h2>${H.board&&H.board.length?'<p class="mu" style="margin:0 0 6px">場: '+H.board.map(cs).join(' ')+'</p>':''}`+P.slice(0,H.n).map((p,k)=>`<div class="row"><span>${R.w.includes(k)?'🏆':''}${esc(p)} ${R.hs&&R.hs[k]?R.hs[k].map(cs).join(' ')+' <span class="mu">'+rl(R.hs[k].concat(H.board||[]))+(H.fold[k]?'（フォールド）':'')+'</span>':H.fold[k]?'<span class="mu">フォールド</span>':''}</span><b class="${R.dl[k]>=0?'pos':'neg'}">${sg(R.dl[k])}</b></div>`).join('')+'</div>';
     }
     h+=`<div class="box"><h2>参加中（${P.length}/${MAX}人・${MIN}人から開始）</h2>${P.map(esc).join('、')}<p class="mu" style="margin:6px 0 0">次のゲーム: ${MN[S.mode||'draw']}${isHost?'（メニューで変更）':''}</p></div>`;
-    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人・時間切れのまま戻っていない人がいます。続けるとその人は外れます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}">${P.length<MIN?'<p class="mu">'+MIN+'人以上そろうと始められます</p>':`<button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button>`}</div>`
+    h+=isHost?`<div class="box"><h2>参加費（ゲームごとに変更できます）</h2>${(S.gone||[]).length?'<p class="mu">退出した人・時間切れのまま戻っていない人がいます。続けるとその人は外れます。</p>':''}<input id="an" type="number" inputmode="numeric" value="${S.ante}">${P.length<MIN?'<p class="mu">'+MIN+'人以上そろうと始められます</p>':S.mode!='holdem'&&P.length-(S.gone||[]).length>MAXD?'<p class="neg">5枚ドローは'+MAXD+'人までです。メニューでテキサスホールデムに切り替えてください</p>':`<button class="b" onclick="startGame()">${H?'次のゲームを始める':'ゲーム開始'}</button>`}</div>`
       :`<div class="box mu">ホストがゲームを始めるのを待っています…</div>`;
   }else{
     const hd=H.mode=='holdem',PL=P.slice(0,H.n);
     const stage={bet1:'ベット①',bet2:'交換→ベット②',pre:'プリフロップ',flop:'フロップ',turn:'ターン',river:'リバー'}[H.phase];
-    h+=`<div class="box"><h2>ゲーム ${H.r}｜${MN[H.mode||'draw']}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+PL.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${(H.to||[]).includes(k)?' <span class="mu">(時間切れ)</span>':gn.includes(p)?' <span class="mu">(退出)</span>':H.fold[k]?' <span class="mu">(フォールド)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k]+'枚交換</span>':''}</span><span>投入 ${H.inv[k]}</span></div>`).join('')+(S.tmo>0?`<p class="mu" style="margin:6px 0 0">${esc(P[H.turn])} の番｜<b id="tm">${tmText()}</b>（時間切れは自動でフォールド）</p>`:'')+(W.length?`<p class="mu" style="margin:6px 0 0">次のゲームから参加: ${W.map(esc).join('、')}</p>`:'')+'</div>';
+    h+=`<div class="box"><h2>ゲーム ${H.r}｜${MN[H.mode||'draw']}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+PL.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${(H.to||[]).includes(k)?' <span class="mu">(時間切れ)</span>':gn.includes(p)?' <span class="mu">(退出)</span>':H.fold[k]?' <span class="mu">(フォールド)</span>':(H.ai||[]).includes(k)?' <span class="mu">(オールイン)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k]+'枚交換</span>':''}</span><span style="white-space:nowrap">持ち ${tot[k]-H.inv[k]}｜投入 ${H.inv[k]}</span></div>`).join('')+(S.tmo>0?`<p class="mu" style="margin:6px 0 0">${esc(P[H.turn])} の番｜<b id="tm">${tmText()}</b>（時間切れは自動でフォールド）</p>`:'')+(W.length?`<p class="mu" style="margin:6px 0 0">次のゲームから参加: ${W.map(esc).join('、')}</p>`:'')+'</div>';
     if(hd)h+=`<div class="box"><h2>場のカード</h2><div class="hand">${[0,1,2,3,4].map(j=>H.board[j]!=null?`<div class="c ${rd(H.board[j])?'r':''}">${cs(H.board[j])}</div>`:'<div class="c" style="opacity:.35">?</div>').join('')}</div></div>`;
     if(wt)h+='<div class="box">いまのゲームが終わったら参加します。このままお待ちください。</div>';
     else{
@@ -342,6 +353,7 @@ function render(){
       else if(myT){const need=H.cb-H.rb[i];
         h+=`<input id="rz" type="number" inputmode="numeric" value="${H.ante}">
 <button class="b" onclick="act2('raise')">${need?`コール${need}＋`:''}レイズ（上のぶんを上乗せ）</button>
+${tot[i]-H.inv[i]-need>0?`<button class="b a" onclick="allIn()">オールイン（持ちチップ ${tot[i]-H.inv[i]} を全部賭ける）</button>`:''}
 <button class="b g" onclick="act2('call')">${need?'コール '+need:'チェック'}</button>
 <button class="b x" onclick="act2('fold')">フォールド</button>`}
       else h+=`<p class="mu">${esc(P[H.turn])} の番です…</p>`;
