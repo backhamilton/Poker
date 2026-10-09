@@ -25,15 +25,15 @@ svg{width:100%;height:auto;display:block}
 <h1>♠ ポーカー（2〜10人）</h1>
 <button id="mb" class="b g" style="display:none;margin:0 0 12px" onclick="togMenu()">☰ メニュー（ホスト用）</button>
 <div id="mn" class="box" style="display:none">
-<h2>部屋コード（ゲームの途中でも入れます）</h2>
-<div class="code" id="rc"></div>
+<div id="rcw"><h2>部屋コード（ゲームの途中でも入れます）</h2>
+<div class="code" id="rc"></div></div>
 <h2>ゲームモード（次のゲームから反映）</h2>
 <select id="md" onchange="setMode(this.value)"><option value="draw">5枚ドロー</option><option value="holdem">テキサスホールデム</option></select>
 <h2>初期チップ（全員一律）</h2>
 <input id="c0" type="number" inputmode="numeric" value="0">
 <button class="b" style="margin-top:0" onclick="setChips()">初期チップを反映する</button>
-<h2>持ち時間（時間切れは自動でフォールド）</h2>
-<select id="to" onchange="setTmo(this.value)"><option value="30">30秒</option><option value="60">60秒</option><option value="90">90秒</option><option value="120">2分</option><option value="180">3分</option><option value="0">なし（待ち続ける）</option></select>
+<div id="tow"><h2>持ち時間（時間切れは自動でフォールド）</h2>
+<select id="to" onchange="setTmo(this.value)"><option value="30">30秒</option><option value="60">60秒</option><option value="90">90秒</option><option value="120">2分</option><option value="180">3分</option><option value="0">なし（待ち続ける）</option></select></div>
 <h2>プレイヤーを退出させる</h2>
 <div id="kl"></div>
 </div>
@@ -98,11 +98,12 @@ function startGame(){
   msg='';
   if((S.gone||[]).length)cleanup();
   seat();
-  const a=Math.max(1,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt($('#an').value)||10));
+  const ae=$('#an'),a=Math.max(1,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt(ae?ae.value:S.ante)||10));
   const n=S.players.length;if(n<MIN){bc();render();return}
   if(S.mode!='holdem'&&n>MAXD){msg='5枚ドローは'+MAXD+'人までです。メニューでテキサスホールデムに切り替えてください';bc();render();return}
   const r=(S.hn||0)+1,z=v=>Array(n).fill(v),mode=S.mode=='holdem'?'holdem':'draw',hc=mode=='holdem'?2:5;S.ante=a;
-  S.H={r,n,mode,ante:a,phase:mode=='holdem'?'pre':'bet1',turn:(r-1)%n,pot:a*n,inv:z(a),rb:z(0),cb:0,acted:z(0),fold:z(0),disc:z(null)};
+  S.H={r,n,mode,ante:a,phase:mode=='holdem'?'pre':'bet1',turn:(r-1)%n,pot:a*n,inv:z(a),rb:z(0),cb:0,acted:z(0),fold:z(0),disc:z(null),la:z(''),nr:0,ag:z(0)};
+  if(solo)S.players.forEach(q=>tnd(q).h++);
   if(mode=='holdem')S.H.board=[];
   SEC.deck=shuf();SEC.r=r;SEC.hands=Array.from({length:n},(_,i)=>SEC.deck.slice(i*hc,i*hc+hc));SEC.pos=n*hc;SEC.dis=[];
   bc();render();
@@ -126,19 +127,122 @@ function adv(i){
   if(alive(H).length==1)return endHand(0);
   for(let k=1;k<H.n;k++){const j=(i+k)%H.n;if(!H.fold[j]&&!(H.acted[j]&&H.rb[j]==H.cb)){H.turn=j;return}}
   const nx=NEXT[H.phase];if(!nx)return endHand(1);
-  H.phase=nx;H.rb=Array(H.n).fill(0);H.cb=0;H.acted=Array(H.n).fill(0);let t=(H.r-1)%H.n;while(H.fold[t])t=(t+1)%H.n;H.turn=t;
+  H.phase=nx;H.rb=Array(H.n).fill(0);H.cb=0;H.nr=0;H.acted=Array(H.n).fill(0);if(H.la)H.la=H.la.map((x,k)=>H.fold[k]?x:'');let t=(H.r-1)%H.n;while(H.fold[t])t=(t+1)%H.n;H.turn=t;
   if(H.mode=='holdem'){const k=nx=='flop'?3:1;for(let x=0;x<k;x++)H.board.push(SEC.deck[SEC.pos++])}
 }
 function act(i,a,n){
   const H=S.H;
+  let lab='フォールド';const nd=H.cb-H.rb[i],tn=solo?tnd(S.players[i]):null;
   if(a=='fold')H.fold[i]=1;
   else{
-    let put=H.cb-H.rb[i];
-    if(a=='allin'){const r=chips(S.players[i])-H.inv[i]-put;if(r<=0)return;put+=r;H.cb+=r;H.acted=Array(H.n).fill(0);H.ai=[...(H.ai||[]),i]}
-    else if(a=='raise'){n=Math.max(H.ante,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0)}
+    let put=H.cb-H.rb[i];lab=put>0?'コール '+put:'チェック';
+    if(a=='allin'){const r=chips(S.players[i])-H.inv[i]-put;if(r<=0)return;put+=r;H.cb+=r;H.acted=Array(H.n).fill(0);H.ai=[...(H.ai||[]),i];H.nr=(H.nr||0)+1;if(H.ag)H.ag[i]++;lab='オールイン '+put}
+    else if(a=='raise'){n=Math.max(H.ante,Math.min(Number.MAX_SAFE_INTEGER/1e3,parseInt(n)||0));put+=n;H.cb+=n;H.acted=Array(H.n).fill(0);H.nr=(H.nr||0)+1;if(H.ag)H.ag[i]++;lab='レイズ '+n}
     H.rb[i]+=put;H.inv[i]+=put;H.pot+=put;
   }
+  if(H.la)H.la[i]=lab;
+  if(tn){if(a=='raise'||a=='allin')tn.r++;if(nd>0){if(a=='fold')tn.f++;else tn.c++}}
   H.acted[i]=1;adv(i);
+}
+// ---- コンピューター（勝率のシミュレーション＋ポットオッズで判断する）----
+let solo=false,cpuT=null,CPU_MS=900,SIMS=900; // SIMS: 勝率を出すときの試行回数の目安
+const isCpu=nm=>solo&&(S.cpu||[]).includes(nm);
+// 5枚ドローの交換の定石: 残すカードの位置を返す
+function keepIdx(h){
+  const r=h.map(c=>c%13),su=h.map(c=>c/13|0),cat=ev(h)[0],cnt={};r.forEach(x=>cnt[x]=(cnt[x]||0)+1);
+  const all=[0,1,2,3,4],of=x=>all.filter(j=>x(j));
+  if(cat>=4)return all;                                        // ストレート以上はそのまま
+  if(cat==3||cat==7)return of(j=>cnt[r[j]]>=3);                  // スリーカードは3枚残す
+  if(cat==2)return of(j=>cnt[r[j]]==2);                          // ツーペアは4枚残す
+  const pr=cat==1?+Object.keys(cnt).find(k=>cnt[k]==2):-1;
+  if(pr>=9)return of(j=>r[j]==pr);                               // J以上のペアは残す
+  const fs=[0,1,2,3].find(t=>su.filter(x=>x==t).length==4);
+  if(fs!=null)return of(j=>su[j]==fs);                           // 4枚フラッシュは1枚交換
+  const u=[...new Set(r.map(x=>x+2))];for(const x of[...u])if(x==14)u.push(1);
+  for(let lo=10;lo>=1;lo--){const need=[lo,lo+1,lo+2,lo+3];if(lo>1&&lo<=10&&need.every(x=>u.includes(x))&&(lo+4<=14)){const v=need.map(x=>x==1?12:x-2);return v.map(x=>r.indexOf(x))}} // 両端が開いた4枚ストレート
+  if(pr>=0)return of(j=>r[j]==pr);                               // 小さいペアでも残す
+  const hi=all.slice().sort((a,b)=>r[b]-r[a]);return hi.slice(0,r[hi[1]]>=9?2:1);  // 役なし: 高いカードを残す
+}
+// 山からの抜き取り（シミュレーション用）
+function pick(pool,k,ex){ex=ex||[];if(pool.length-ex.length<k)return null;const ix=[];while(ix.length<k){const j=Math.floor(Math.random()*pool.length);if(!ix.includes(j)&&!ex.includes(j))ix.push(j)}return ix}
+const rm=(pool,ix)=>{ix.slice().sort((a,b)=>b-a).forEach(j=>{pool[j]=pool[pool.length-1];pool.pop()})};
+function drawSim(h,pool){const k=keepIdx(h),ix=pick(pool,5-k.length);if(!ix)return h;const o=k.map(j=>h[j]).concat(ix.map(j=>pool[j]));rm(pool,ix);return o}
+// プリフロップの手の強さ（チェンの公式）。6以上が上位25%、8以上が上位11%
+function chen(h){const v=h.map(c=>c%13+2).sort((a,b)=>b-a),[a,b]=v;let s=a==14?10:a==13?8:a==12?7:a==11?6:a/2;if(a==b)return Math.max(5,s*2);if((h[0]/13|0)==(h[1]/13|0))s+=2;const g=a-b-1;s-=g<=0?0:g==1?1:g==2?2:g==3?4:5;if(g<=1&&a<12)s+=1;return Math.ceil(s)}
+function bcat(bd){const n={};bd.forEach(c=>n[c%13]=(n[c%13]||0)+1);const v=Object.values(n).sort((a,b)=>b-a);return v[0]>=4?7:v[0]==3?3:v[0]==2&&v[1]==2?2:v[0]==2?1:0}
+// 手の強さの段階: 0 何もない / 1 ドロー・弱いペア / 2 ペア / 3 ツーペア級 / 4 ストレート以上
+function hscore(h,bd,mode){
+  if(mode=='holdem'){
+    if(!bd.length){const c=chen(h);return c>=8?3:c>=6?2:0}
+    const c=h.concat(bd),cat=best(c)[0],bc=bcat(bd);
+    if(cat>=4)return 4;if(cat>=2&&cat>bc)return 3;if(cat>bc)return 2;
+    if(bd.length<5){const su=[0,0,0,0];c.forEach(x=>su[x/13|0]++);if(su.some((n,t)=>n>=4&&h.some(x=>(x/13|0)==t)))return 1}
+    return 0}
+  const e=ev(h),cat=e[0];return cat>=4?4:cat>=2?3:cat==1&&e[1]>=11?2:cat==1?1:0;
+}
+// 相手の傾向（コンピューター対戦のときだけ数える）
+const tnd=nm=>{const T=S.tn=S.tn||{};return T[nm]=T[nm]||{h:0,r:0,c:0,f:0}};
+// よくレイズする人ほど、レイズに情報がない（ブラフが多い）とみる: 0=ふつう 〜 1=毎回レイズする人
+const loose=nm=>{const t=tnd(nm);return t.h<5?0:Math.max(0,Math.min(1,(t.r/t.h-0.2)/0.6))};
+const foldRate=nm=>{const t=tnd(nm),n=t.c+t.f;return n>=5?t.f/n:0.45}; // 賭けられたときに降りる割合
+// 読み: レイズした相手は、一定の割合でブラフ、残りは強い手を持っているとみる
+// ふつうの人なら1回で3割・2回以上で15%。よくレイズする人ほど9割まで上げる
+const bluffP=(ag,ls,base)=>{const b=base!=null?base:ag==1?0.3:0.15;return b+(0.9-b)*ls};
+const need=ag=>ag==1?2:3;
+// 勝率: 自分の札と場の札だけを使い、ほかの人の札は「賭け方と矛盾しない手」を山からランダムに何百回も試す
+function equity(H,i,read){
+  const me=SEC.hands[i],bd=H.board||[],ops=alive(H).filter(o=>o!=i),sims=Math.min(300,Math.round(SIMS/(ops.length+1)));
+  const known=new Set([...me,...bd]),rest=[...Array(52).keys()].filter(c=>!known.has(c));
+  const ag=ops.map(o=>read?(H.ag||[])[o]||0:0),ls=ops.map(o=>loose(S.players[o])),pat=ops.map(o=>read&&H.mode!='holdem'&&H.disc[o]===0); // パット（1枚も交換しない）はストレート以上か、ブラフ
+  let win=0;
+  for(let t=0;t<sims;t++){
+    const pool=rest.slice(),sc=[];let my;
+    if(H.mode=='holdem'){
+      const hs=ops.map((o,k)=>{const so=ag[k]>0&&Math.random()>=bluffP(ag[k],ls[k]);for(let u=0;;u++){const ix=pick(pool,2),h=ix.map(j=>pool[j]);if(u>=120||!so||hscore(h,bd,'holdem')>=need(ag[k])){rm(pool,ix);return h}}});
+      const ix=pick(pool,5-bd.length),b=bd.concat(ix.map(j=>pool[j]));rm(pool,ix);
+      my=best(me.concat(b));hs.forEach(h=>sc.push(best(h.concat(b))));
+    }else{
+      ops.forEach((o,k)=>{const so=pat[k]?Math.random()>=bluffP(1,ls[k],0.25):ag[k]>0&&Math.random()>=bluffP(ag[k],ls[k]),nd=pat[k]?4:need(ag[k]);for(let u=0;;u++){
+        const ix=pick(pool,5);if(!ix)return;const h=ix.map(j=>pool[j]),kp=keepIdx(h),ix2=pick(pool,5-kp.length,ix);
+        const f=ix2?kp.map(j=>h[j]).concat(ix2.map(j=>pool[j])):h;
+        if(u>=(pat[k]?300:120)||!so||hscore(H.disc[o]!=null?f:h,[],'draw')>=nd){rm(pool,ix.concat(ix2||[]));sc.push(ev(f));return}}});
+      my=ev(H.disc[i]==null?drawSim(me,pool):me);
+    }
+    let lose=false,tie=0;for(const o of sc){const c=cmp(o,my);if(c>0){lose=true;break}if(c==0)tie++}
+    if(!lose)win+=1/(tie+1);
+  }
+  return win/sims;
+}
+function cpuMove(i){
+  const H=S.H,nm=S.players[i],read=((S.lv||{})[nm]||2)>=2;
+  if(H.mode!='holdem'&&H.phase=='bet2'&&H.disc[i]==null){const k=keepIdx(SEC.hands[i]);apply({t:'draw',name:nm,d:[0,1,2,3,4].filter(j=>!k.includes(j))});return}
+  const ops=alive(H).filter(o=>o!=i),e=equity(H,i,read),opp=ops.length,need=H.cb-H.rb[i],pot=H.pot,fair=1/(opp+1),odds=need/(pot+need),room=chips(nm)-H.inv[i]-need,canR=(H.nr||0)<3&&room>=H.ante;
+  const amt=f=>Math.min(room,Math.max(H.ante,Math.round(pot*f/H.ante)*H.ante));
+  let a='call',n=0,bl=false;
+  if(need==0){
+    if(canR&&e>Math.max(0.3,fair*1.6)){a='raise';n=amt(e>0.75?1:0.6)}            // 強いときは打って出る（強いほど大きく）
+    else if(read&&canR&&opp<=2){                                               // ブラフ: 相手が少なく、誰も賭けていないとき
+      const b=amt(0.6),be=b/(pot+b);                                           // 相手が全員降りる確率がこれ以上ならブラフは得
+      const pf=ops.reduce((x,o)=>x*foldRate(S.players[o]),1);
+      const late=H.mode=='holdem'?(H.phase=='turn'||H.phase=='river'):H.phase=='bet2';
+      const semi=H.mode=='holdem'&&(H.phase=='flop'||H.phase=='turn')&&e>=0.25&&e<=0.5;   // セミブラフ: まだ伸びる手
+      const q=semi?0.35:late&&e<fair*0.7?b/(pot+2*b):0;                          // 弱い手だけを、理論上の割合（賭け額÷(ポット＋賭け額×2)）でブラフに回す
+      if(q>0&&pf>=be*0.9&&Math.random()<q){a='raise';n=b;bl=true}
+    }
+  }
+  else if(e<odds+0.03)a='fold';                                                // 勝率がポットオッズに届かなければ降りる
+  else if(canR&&e>Math.max(0.5,fair*2.2)){a='raise';n=amt(e>0.75?1:0.6)}         // 十分に勝っていればレイズ
+  H.eq=H.eq||{};H.eq[i]=Math.round(e*100);if(bl)(H.bl=H.bl||[]).push(i);
+  apply({t:'act',name:nm,a,n});
+}
+function cpuTick(){clearTimeout(cpuT);if(!solo)return;const H=S.H;if(!H||H.phase=='end')return;const i=H.turn;if(!isCpu(S.players[i]))return;cpuT=setTimeout(()=>{if(solo&&S.H===H&&H.turn==i&&H.phase!='end')cpuMove(i)},CPU_MS)}
+function startSolo(){
+  const nm=($('#nm')&&$('#nm').value.trim().slice(0,12))||myName||'あなた',n=+$('#sn').value,mode=$('#sm').value;
+  if(mode!='holdem'&&n>MAXD){msg='5枚ドローは'+MAXD+'人までです';render();return}
+  gen++;reset0();solo=true;isHost=true;left=false;msg='';ner='';myName=nm;code='';try{localStorage.setItem('pk',nm)}catch(e){}
+  const cpu=Array.from({length:n-1},(_,k)=>'CPU'+(k+1));
+  S={players:[nm,...cpu],cpu,hist:[],H:null,ante:10,hn:0,tmo:0,ver:VN,mode,chips0:1000};
+  startGame();
 }
 function cleanup(){S.players=S.players.filter(p=>!(S.gone||[]).includes(p));S.gone=[];S.H=null;if(S.sq)for(const k in S.sq)if(!S.players.includes(k))delete S.sq[k]}
 function apply(m){
@@ -171,7 +275,7 @@ function apply(m){
 }
 
 // ---- 通信（ntfy.sh 経由・HTTPS/443。ホストが正）----
-const VER='3.4（2026-10-06）',VN=34; // VN: 通信のやり方の版。ホストと違うと手札が読めない
+const VER='3.6（2026-10-09）',VN=36; // VN: 通信のやり方の版。ホストと違うと手札が読めない
 const NT='https://ntfy.sh/';
 const LOG=[];function lg(t){LOG.push(new Date().toTimeString().slice(0,8)+' '+t);const e=$('#log');if(e)e.textContent=LOG.slice(-25).join('\n')}
 let left=false,es=null,isHost=false,myName='',code='',msg='',ner='',sel=new Set(),selK='',out=null,gen=0;
@@ -198,7 +302,7 @@ async function pump(){
   }
   busy=false;
 }
-const bc=()=>{if(!isHost)return;syncT();syncHx();S.v=(S.v||0)+1;pub('s',{S,ts:Date.now()})};
+const bc=()=>{if(!isHost)return;syncT();syncHx();S.v=(S.v||0)+1;if(solo){cpuTick();return}pub('s',{S,ts:Date.now()})};
 const send=m=>isHost?apply(m):pub('a',m);
 // 受信: 切れたら自分でつなぎ直し、切れていた間の分も受け取る
 const SUBS=new Set();
@@ -230,7 +334,7 @@ setInterval(()=>{
 },1000);
 function name(){const n=$('#nm').value.trim().slice(0,12);if(!n){msg='名前を入れてください';render();return null}
   myName=n;left=false;try{localStorage.setItem('pk',n)}catch(e){}return n}
-function reset0(){try{es&&es.close()}catch(e){}es=null;isHost=false;out=null;S={players:[],hist:[],H:null,ante:10};sel=new Set()}
+function reset0(){try{es&&es.close()}catch(e){}es=null;isHost=false;solo=false;clearTimeout(cpuT);out=null;S={players:[],hist:[],H:null,ante:10};sel=new Set()}
 function closeLocal(text){gen++;reset0();left=true;msg=text;render()}
 function host(){
   if(!name())return;
@@ -270,11 +374,12 @@ function joinRoom(){
 }
 function leave(){
   if(!confirm('退出しますか？'))return;
+  if(solo){gen++;reset0();left=true;msg='';ent='top';render();return}
   if(isHost)pub('s',{t:'x'});else send({t:'leave',name:myName});
   const e=es;es=null;setTimeout(()=>{try{e&&e.close()}catch(x){}},1500);
   gen++;reset0();left=true;msg='退出しました';render();
 }
-let mo=false;
+let mo=false,ent='top';
 function togMenu(){mo=!mo;if(mo)$('#c0').value=S.chips0||0;render()}
 function setMode(v){if(!isHost)return;S.mode=v=='holdem'?'holdem':'draw';bc();render()}
 function setTmo(v){if(!isHost)return;v=parseInt(v);S.tmo=Number.isFinite(v)&&v>0?Math.min(3600,v):0;bc();render()}
@@ -303,9 +408,9 @@ function chart(){
 const sg=v=>(v>0?'+':'')+v;
 function setApp(h){
   const A=$('#app'),old={},ae=document.activeElement,fid=ae&&ae.id;
-  A.querySelectorAll('input').forEach(e=>{if(e.id)old[e.id]=e.value});
+  A.querySelectorAll('input,select').forEach(e=>{if(e.id)old[e.id]=e.value});
   A.innerHTML=h;
-  A.querySelectorAll('input').forEach(e=>{if(e.id in old)e.value=old[e.id]});
+  A.querySelectorAll('input,select').forEach(e=>{if(e.id in old)e.value=old[e.id]});
   if(fid&&fid in old){const e=$('#'+fid);if(e&&e!==document.activeElement)try{e.focus()}catch(x){}}
 }
 const rl=c=>c.length>=5?HN[best(c)[0]]:(c.length==2&&c[0]%13==c[1]%13?'ワンペア':'ハイカード');
@@ -313,17 +418,22 @@ const cards=(h,click,hl)=>'<div class="hand">'+h.map((c,j)=>`<button class="c ${
 function render(){
   const A=$('#app'),M=(ner?`<p class="neg">${esc(ner)}</p>`:'')+(msg?`<p class="mu">${esc(msg)}</p>`:''),P=S.players,W=S.wait||[],i=P.indexOf(myName),wt=W.includes(myName),inRoom=(i>=0||wt)&&!left;
   $('#lv').style.display=inRoom?'block':'none';
-  $('#rg').style.display=inRoom?'block':'none';$('#rg').textContent=inRoom?'部屋コード '+code+'　｜　今日この端末から送った数（目安） '+cnt(0)+' / 250　｜　バージョン '+VER.slice(0,3):'';
+  $('#rg').style.display=inRoom?'block':'none';$('#rg').textContent=!inRoom?'':solo?'コンピューター対戦（通信なし）　｜　バージョン '+VER.slice(0,3):'部屋コード '+code+'　｜　今日この端末から送った数（目安） '+cnt(0)+' / 250　｜　バージョン '+VER.slice(0,3);
   const hostIn=isHost&&i>=0&&!left,gn=S.gone||[];
   $('#mb').style.display=hostIn?'block':'none';$('#mn').style.display=hostIn&&mo?'block':'none';
-  if(hostIn){$('#rc').textContent=code;$('#md').value=S.mode||'draw';$('#to').value=String(S.tmo||0);
+  if(hostIn){$('#rcw').style.display=solo?'none':'block';$('#tow').style.display=solo?'none':'block';$('#rc').textContent=code;$('#md').value=S.mode||'draw';$('#to').value=String(S.tmo||0);
     $('#kl').innerHTML=[...P,...W].map((p,k)=>p==myName?'':`<div class="row" style="align-items:center;padding:4px 0"><span>${esc(p)}${W.includes(p)?' <span class="mu">(待機中)</span>':''}</span>${gn.includes(p)?'<span class="mu">退出済み</span>':`<button class="b x k" onclick="kick(${k})">退出させる</button>`}</div>`).join('')||'<p class="mu" style="margin:0">ほかのプレイヤーはいません</p>'}
   if(!inRoom){
-    setApp(`<p class="mu" style="margin:0 0 8px">ポーカー（テキサスホールデム 2〜10人／5枚ドロー 2〜6人）　バージョン ${VER}</p>
-<div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
+    const top=`<p class="mu" style="margin:0 0 8px">ポーカー（テキサスホールデム 2〜10人／5枚ドロー 2〜6人）　バージョン ${VER}</p>`,bk='<button class="b g" onclick="ent=\'top\';msg=\'\';render()">← 戻る</button>';
+    if(ent=='top'){setApp(top+`<div class="box"><h2>だれと対戦しますか？</h2><button class="b" onclick="ent='human';render()">人間と対戦（オンライン）</button><button class="b" style="background:#0c8599" onclick="ent='cpu';render()">コンピューターと対戦</button></div>${M}`);return}
+    if(ent=='cpu'){setApp(top+`<div class="box"><h2>コンピューターと対戦</h2><input id="nm" maxlength="12" placeholder="あなたの名前（省略可）" value="${esc(myName)}">
+<h2>遊び方</h2><select id="sm"><option value="holdem">テキサスホールデム</option><option value="draw">5枚ドロー</option></select>
+<h2>人数（あなたを含む）</h2><select id="sn">${[2,3,4,5,6,7,8,9,10].map(k=>`<option value="${k}"${k==4?' selected':''}>${k}人（コンピューター${k-1}人）</option>`).join('')}</select>
+<button class="b" style="background:#0c8599" onclick="startSolo()">ゲームスタート</button>${bk}</div>${M}<p class="mu" style="font-size:13px">コンピューター対戦はこの端末だけで動きます（通信しません）。初期チップは1000、参加費は10です。メニューで変えられます。</p>`);return}
+    setApp(top+`<div class="box"><input id="nm" maxlength="12" placeholder="あなたの名前" value="${esc(myName)}">
 <button class="b" onclick="host()">部屋を作る</button></div>
 <div class="box"><input id="cd" inputmode="numeric" placeholder="友達の部屋コード（6桁）">
-<button class="b" onclick="joinRoom()">部屋に入る</button></div>${M}${!left&&P.length&&P.length+W.length>=MAX?'<p class="mu">満席です（'+MAX+'人まで）。</p>':''}`);return;
+<button class="b" onclick="joinRoom()">部屋に入る</button>${bk}</div>${M}${!left&&P.length&&P.length+W.length>=MAX?'<p class="mu">満席です（'+MAX+'人まで）。</p>':''}`);return;
   }
   const codeBox=isHost?`<div class="box"><h2>部屋コード</h2><div class="code">${esc(code)}</div></div>`:'';
   const H=S.H;let h=M;
@@ -339,7 +449,7 @@ function render(){
   }else{
     const hd=H.mode=='holdem',PL=P.slice(0,H.n);
     const stage={bet1:'ベット①',bet2:'交換→ベット②',pre:'プリフロップ',flop:'フロップ',turn:'ターン',river:'リバー'}[H.phase];
-    h+=`<div class="box"><h2>ゲーム ${H.r}｜${MN[H.mode||'draw']}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+PL.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${(H.to||[]).includes(k)?' <span class="mu">(時間切れ)</span>':gn.includes(p)?' <span class="mu">(退出)</span>':H.fold[k]?' <span class="mu">(フォールド)</span>':(H.ai||[]).includes(k)?' <span class="mu">(オールイン)</span>':H.disc[k]!=null?' <span class="mu">'+H.disc[k]+'枚交換</span>':''}</span><span style="white-space:nowrap">持ち ${tot[k]-H.inv[k]}｜投入 ${H.inv[k]}</span></div>`).join('')+(S.tmo>0?`<p class="mu" style="margin:6px 0 0">${esc(P[H.turn])} の番｜<b id="tm">${tmText()}</b>（時間切れは自動でフォールド）</p>`:'')+(W.length?`<p class="mu" style="margin:6px 0 0">次のゲームから参加: ${W.map(esc).join('、')}</p>`:'')+'</div>';
+    h+=`<div class="box"><h2>ゲーム ${H.r}｜${MN[H.mode||'draw']}｜${stage}｜参加費 ${H.ante}｜ポット ${H.pot}</h2>`+PL.map((p,k)=>`<div class="row"><span>${H.turn==k?'▶':''}${esc(p)}${(H.to||[]).includes(k)?' <span class="mu">(時間切れ)</span>':gn.includes(p)?' <span class="mu">(退出)</span>':H.fold[k]?' <span class="mu">(フォールド)</span>':' <span class="mu">'+[H.disc[k]!=null?H.disc[k]+'枚交換':'',(H.la||[])[k]||((H.ai||[]).includes(k)?'オールイン':'')].filter(x=>x).join('・')+'</span>'}</span><span style="white-space:nowrap">持ち ${tot[k]-H.inv[k]}｜投入 ${H.inv[k]}</span></div>`).join('')+(S.tmo>0?`<p class="mu" style="margin:6px 0 0">${esc(P[H.turn])} の番｜<b id="tm">${tmText()}</b>（時間切れは自動でフォールド）</p>`:'')+(W.length?`<p class="mu" style="margin:6px 0 0">次のゲームから参加: ${W.map(esc).join('、')}</p>`:'')+'</div>';
     if(hd)h+=`<div class="box"><h2>場のカード</h2><div class="hand">${[0,1,2,3,4].map(j=>H.board[j]!=null?`<div class="c ${rd(H.board[j])?'r':''}">${cs(H.board[j])}</div>`:'<div class="c" style="opacity:.35">?</div>').join('')}</div></div>`;
     if(wt)h+='<div class="box">いまのゲームが終わったら参加します。このままお待ちください。</div>';
     else{
