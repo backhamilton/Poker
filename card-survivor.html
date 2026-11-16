@@ -150,6 +150,7 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
       <div>敵が落とす<b>チップ</b>を集めてレベルアップ。毎回<b>3枚から1枚</b>選んで手札へ。</div>
       <div>手札が5枚そろうと<b>役に応じて大強化</b>。強い役を狙って選ぼう。</div>
       <div>1分ごとにボス。3分で<b>ジョーカー</b>が登場。倒せばクリア。</div>
+      <div>ときどきマップに<b>オールインチップ</b>が出現。拾うと落ちているチップを全部回収。</div>
       <div>真ん中の<b>白い点</b>だけが弾の当たり判定。弾をギリギリでかわすと<b>かすり</b>で経験値。</div>
     </div>
     <details>
@@ -334,7 +335,7 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
       st: { dmg: 13, rate: .42, shots: 1, pierce: 0, speed: 155, orbit: 0, nova: 0, magnet: 75, bspd: 420 },
       fireT: 0, novaT: 3, orbA: 0,
       en: [], bul: [], ebul: [], gems: [], items: [], parts: [], texts: [], rings: [],
-      hand: [], spawnAcc: 0, shake: 0, boss: null, events: {}, hint: 4,
+      hand: [], spawnAcc: 0, shake: 0, boss: null, events: {}, hint: 4, nextVac: 25,
     };
     renderHand(); hud();
   }
@@ -560,6 +561,13 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
 
     // timeline
     const ev = g.events;
+    g.nextVac -= dt;
+    if (g.nextVac <= 0 && !g.items.some(it => it.kind === 'vac')) {
+      const a = Math.random() * Math.PI * 2, d = rand(520, 780);
+      g.items.push({ kind: 'vac', x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, t: 0 });
+      g.nextVac = 40;
+      if (!ev.vacHint) { ev.vacHint = 1; banner('オールインチップ出現', '金の矢印の先。拾うとチップを全部回収'); }
+    }
     if (!ev.sw1 && g.t > 40) { ev.sw1 = 1; swarm(18); }
     if (!ev.king && g.t > 60) { ev.king = 1; spawnElite('king'); }
     if (!ev.sw2 && g.t > 100) { ev.sw2 = 1; swarm(26); }
@@ -661,7 +669,8 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
       gm.t += dt;
       const dx = p.x - gm.x, dy = p.y - gm.y, d = Math.hypot(dx, dy) || 1;
       if (d < mag) gm.pull = true;
-      if (gm.pull) { const sp = 260 + gm.t * 80; gm.x += dx / d * sp * dt; gm.y += dy / d * sp * dt; }
+      if (gm.vac) { gm.vt += dt; const sp = 450 + gm.vt * 1400; gm.x += dx / d * sp * dt; gm.y += dy / d * sp * dt; }
+      else if (gm.pull) { const sp = 260 + gm.t * 80; gm.x += dx / d * sp * dt; gm.y += dy / d * sp * dt; }
       if (d < 16) {
         sfx('gem', 40, () => tone(880 + Math.min(900, g.xp / g.need * 900), .04, 'sine', .035));
         gainXp(gm.v); return false;
@@ -673,7 +682,12 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
       it.t += dt;
       const d = Math.hypot(p.x - it.x, p.y - it.y);
       if (d < 22) {
-        if (it.kind === 'heart') { p.hp = Math.min(p.maxHp, p.hp + 2); floatText(p.x, p.y - 26, '+2 HP', '#ff8a96', 14); tone(660, .12, 'sine', .05); tone(990, .15, 'sine', .05, .08); }
+        if (it.kind === 'vac') {
+          let n = 0; for (const gm of g.gems) { gm.vac = true; gm.vt = 0; n += gm.v; }
+          banner('オールイン！', `チップ${n}枚を回収`); g.rings.push({ x: p.x, y: p.y, r: 0, max: 900, col: '#f2b33d' });
+          [523, 784, 1047, 1568].forEach((f, i) => tone(f, .12, 'triangle', .05, i * .06)); buzz([20, 20, 60]);
+        }
+        else if (it.kind === 'heart') { p.hp = Math.min(p.maxHp, p.hp + 2); floatText(p.x, p.y - 26, '+2 HP', '#ff8a96', 14); tone(660, .12, 'sine', .05); tone(990, .15, 'sine', .05, .08); }
         else { g.rerolls++; banner('宝箱！', 'ワイルドカード＋引き直し1回'); addCard({ s: 'w', r: 0 }); [659, 784, 988, 1319].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); }
         return false;
       }
@@ -804,7 +818,14 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     for (const gm of g.gems) drawChip(gm.x, gm.y, gm.v);
     for (const it of g.items) {
       const bob = Math.sin(it.t * 4) * 3;
-      if (it.kind === 'heart') { ctx.fillStyle = '#ff5a6a'; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥', it.x, it.y + bob); }
+      if (it.kind === 'vac') {
+        const pr = 1 + Math.sin(it.t * 5) * .1;
+        ctx.fillStyle = 'rgba(242,179,61,.22)'; ctx.beginPath(); ctx.arc(it.x, it.y, 34 * pr, 0, 7); ctx.fill();
+        ctx.fillStyle = '#f2b33d'; ctx.beginPath(); ctx.arc(it.x, it.y + bob, 17, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(it.x, it.y + bob, 13, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#1a1a1a'; ctx.font = '800 10px "Bungee", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ALL', it.x, it.y + bob + 1);
+      }
+      else if (it.kind === 'heart') { ctx.fillStyle = '#ff5a6a'; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥', it.x, it.y + bob); }
       else {
         ctx.fillStyle = 'rgba(242,179,61,.25)'; ctx.beginPath(); ctx.arc(it.x, it.y, 26 + Math.sin(it.t * 5) * 4, 0, 7); ctx.fill();
         ctx.fillStyle = '#8a5a2b'; rrect(it.x - 14, it.y - 10 + bob, 28, 20, 4); ctx.fill(); ctx.fillStyle = '#f2b33d'; ctx.fillRect(it.x - 14, it.y - 3 + bob, 28, 4); ctx.fillRect(it.x - 2, it.y - 10 + bob, 4, 20);
@@ -846,6 +867,16 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     for (const t of g.texts) { ctx.globalAlpha = Math.min(1, t.life * 3); ctx.font = `800 ${t.size}px "M PLUS Rounded 1c", sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(t.txt, t.x, t.y); ctx.fillStyle = t.col; ctx.fillText(t.txt, t.x, t.y); }
     ctx.globalAlpha = 1;
     // off-screen boss arrow
+    const vac = g.items.find(it => it.kind === 'vac');
+    if (vac) {
+      const bx = vac.x - cx, by = vac.y - cy;
+      if (bx < 0 || by < 0 || bx > VW || by > VH) {
+        const a = Math.atan2(by - VH / 2, bx - VW / 2), ex = clamp(bx, 24, VW - 24), ey = clamp(by, 90, VH - 110);
+        ctx.save(); ctx.translate(cx + ex, cy + ey); ctx.rotate(a); ctx.fillStyle = '#f2b33d';
+        ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.fill();
+        ctx.rotate(-a); ctx.font = '800 9px "Bungee", sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ALL', -Math.cos(a) * 18, -Math.sin(a) * 18 + 3); ctx.restore();
+      }
+    }
     if (g.boss && !g.boss.dead) {
       const b = g.boss, bx = b.x - cx, by = b.y - cy;
       if (bx < 0 || by < 0 || bx > VW || by > VH) {
