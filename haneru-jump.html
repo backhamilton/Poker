@@ -1,0 +1,541 @@
+<title>ハネル・ジャンプ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rampart+One&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+<style>
+/* Layout: full-bleed side-scrolling canvas; HUD top, faint touch-zone hints (left = run, right = jump). Single bright daytime look by choice. */
+:root {
+  --sky: #8fd3f4;
+  --sky-low: #e6f6ff;
+  --ink: #23324a;
+  --paper: #fffaf0;
+  --accent: #ff7a3d;
+  --coin: #ffc93c;
+  --font-display: "Rampart One", "Hiragino Sans", system-ui, sans-serif;
+  --font-body: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+  color-scheme: light;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--sky); color: var(--ink); font-family: var(--font-body); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hud {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 2; pointer-events: none;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.chip { background: rgba(255,250,240,.85); border-radius: 12px; padding: 6px 10px; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; box-shadow: 0 2px 0 rgba(35,50,74,.15); }
+.chip .k { font-size: 10px; letter-spacing: .1em; opacity: .6; display: block; }
+.hud .grp { display: flex; gap: 6px; }
+.pausebtn { pointer-events: auto; appearance: none; border: 0; background: rgba(255,250,240,.85); color: var(--ink); border-radius: 12px; font: 800 14px var(--font-body); padding: 10px 12px; cursor: pointer; box-shadow: 0 2px 0 rgba(35,50,74,.15); }
+.zones { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1; pointer-events: none; display: flex; justify-content: space-between;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.zones span { font-size: 12px; font-weight: 800; color: rgba(35,50,74,.55); background: rgba(255,250,240,.55); border-radius: 999px; padding: 4px 10px; }
+.overlay {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: rgba(143, 211, 244, .82); backdrop-filter: blur(3px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+.panel { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; text-align: center; background: var(--paper); border-radius: 20px; padding: 20px 18px; box-sizing: border-box; box-shadow: 0 6px 0 rgba(35,50,74,.18); }
+h1, h2 { margin: 0; font-family: var(--font-display); font-weight: 400; color: var(--accent); line-height: 1.1; text-wrap: balance; }
+h1 { font-size: clamp(38px, 12vw, 54px); }
+h1 small { display: block; font-family: var(--font-body); font-size: 13px; letter-spacing: .3em; color: var(--ink); font-weight: 800; margin-top: 4px; }
+h2 { font-size: 34px; }
+.panel p { margin: 0; font-size: 14px; line-height: 1.7; }
+.how { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.how div { background: #eef7fc; border-radius: 12px; padding: 10px 8px; font-size: 13px; line-height: 1.5; }
+.how b { display: block; font-size: 15px; }
+.btn { appearance: none; border: 0; background: #e7eef5; color: var(--ink); border-radius: 14px; font: 800 15px var(--font-body); padding: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(35,50,74,.18); }
+.btn.primary { background: var(--accent); color: #fff; font-size: 18px; padding: 15px; }
+.btn:focus-visible, .pausebtn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.stats div { background: #eef7fc; border-radius: 10px; padding: 8px 4px; }
+.stats .k { font-size: 11px; opacity: .7; }
+.stats .v { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.toast { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none; font-family: var(--font-display); font-size: 38px; color: var(--accent); text-shadow: 0 3px 0 var(--paper); animation: toast 1.6s ease-out forwards; white-space: nowrap; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+</style>
+
+<canvas id="cv"></canvas>
+<div class="hud">
+  <div class="grp">
+    <div class="chip"><span class="k">ステージ</span><span id="hStage">1-1</span></div>
+    <div class="chip"><span class="k">コイン</span><span id="hCoin">0</span></div>
+    <div class="chip"><span class="k">タイム</span><span id="hTime">0.0</span></div>
+  </div>
+  <button class="pausebtn" id="pauseBtn" type="button">II</button>
+</div>
+<div class="zones" id="zones"><span>← 左側をドラッグで移動 →</span><span>右側タップでジャンプ</span></div>
+
+<div class="overlay" id="startOv">
+  <div class="panel">
+    <h1>ハネル・ジャンプ<small>HANERU JUMP</small></h1>
+    <p>うさぎ耳の<b>ハネル</b>を走らせて、3つのステージのゴールの旗をめざそう。</p>
+    <div class="how">
+      <div><b>画面の左側</b>指を置いて左右にドラッグで走る</div>
+      <div><b>画面の右側</b>タップでジャンプ。長押しで高く跳ぶ</div>
+    </div>
+    <p style="font-size:13px">トゲぼうは<b>上から踏む</b>と倒せる。トゲや穴に落ちたら<b>旗のチェックポイント</b>から再開。</p>
+    <button class="btn primary" id="startBtn" type="button">はじめる</button>
+    <p style="font-size:12px;opacity:.7">横向きにするとより遠くまで見えます</p>
+  </div>
+</div>
+<div class="overlay" id="pauseOv" hidden>
+  <div class="panel">
+    <h2>ポーズ</h2>
+    <button class="btn primary" id="resumeBtn" type="button">つづける</button>
+    <button class="btn" id="restartBtn" type="button">このステージを最初から</button>
+    <button class="btn" id="quitBtn" type="button">タイトルへ</button>
+  </div>
+</div>
+<div class="overlay" id="clearOv" hidden>
+  <div class="panel">
+    <h2 id="cTitle">ステージクリア！</h2>
+    <div class="stats">
+      <div><div class="k">タイム</div><div class="v" id="cTime">0</div></div>
+      <div><div class="k">コイン</div><div class="v" id="cCoin">0</div></div>
+      <div><div class="k">ミス</div><div class="v" id="cMiss">0</div></div>
+    </div>
+    <p id="cBest" style="font-weight:800;color:var(--accent)"></p>
+    <div class="row">
+      <button class="btn" id="cTitleBtn" type="button">タイトル</button>
+      <button class="btn primary" id="nextBtn" type="button">次へ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  let bestTime = store.get('hj_best', null);
+
+  // ---------- level building ----------
+  const ROWS = 14;
+  function makeLevel(len, build) {
+    const g = Array.from({ length: ROWS }, () => Array(len).fill('.'));
+    const set = (x, y, c) => { if (x >= 0 && x < len && y >= 0 && y < ROWS) g[y][x] = c; };
+    const api = {
+      ground(x0, x1, h) { for (let x = x0; x <= x1; x++) for (let y = ROWS - h; y < ROWS; y++) set(x, y, '#'); },
+      block(x0, x1, y0, y1) { for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) set(x, y, '#'); },
+      plat(x0, x1, y) { for (let x = x0; x <= x1; x++) set(x, y, '-'); },
+      spikes(x0, x1, y) { for (let x = x0; x <= x1; x++) set(x, y, '^'); },
+      coins(x0, x1, y) { for (let x = x0; x <= x1; x++) set(x, y, 'o'); },
+      coin: (x, y) => set(x, y, 'o'),
+      enemy: (x, y) => set(x, y, 'e'),
+      start: (x, y) => set(x, y, 'P'),
+      check: (x, y) => set(x, y, 'C'),
+      goal: (x, y) => set(x, y, 'G'),
+    };
+    build(api);
+    return g.map(r => r.join(''));
+  }
+  // Ground of height h has its walkable surface on row 14-h; things standing on it go on row 13-h.
+  const LEVELS = [
+    { name: '1-1 はらっぱ', map: makeLevel(100, L => {
+      L.ground(0, 22, 2); L.start(2, 11); L.coins(7, 11, 9);
+      L.ground(23, 32, 3); L.enemy(29, 10);
+      L.ground(36, 52, 3); L.coins(33, 35, 8); L.enemy(46, 10);
+      L.block(42, 43, 9, 9); L.coin(42, 8); L.coin(43, 8);
+      L.ground(53, 66, 2); L.check(55, 11); L.plat(58, 62, 10); L.coins(58, 62, 9); L.spikes(60, 61, 11);
+      L.ground(70, 99, 2); L.coins(67, 69, 9); L.enemy(80, 11); L.enemy(86, 11);
+      L.block(88, 89, 10, 11); L.block(90, 91, 9, 11);
+      L.goal(96, 11);
+    }) },
+    { name: '1-2 くものうえ', map: makeLevel(130, L => {
+      L.ground(0, 12, 3); L.start(2, 10);
+      L.plat(15, 18, 9); L.coins(15, 18, 8);
+      L.plat(21, 24, 7); L.coins(21, 24, 6);
+      L.ground(26, 38, 4); L.enemy(31, 9); L.enemy(35, 9);
+      L.plat(41, 43, 8); L.plat(46, 48, 6); L.coins(46, 48, 5);
+      L.ground(50, 64, 3); L.check(51, 10); L.spikes(56, 58, 10); L.coins(55, 59, 8);
+      L.ground(67, 71, 2); L.enemy(69, 11);
+      L.ground(74, 78, 4);
+      L.plat(81, 83, 8); L.plat(86, 88, 8); L.coins(81, 88, 7);
+      L.ground(91, 105, 3); L.check(92, 10); L.enemy(97, 10); L.enemy(101, 10);
+      L.plat(108, 111, 9); L.coins(108, 111, 8);
+      L.ground(114, 129, 3); L.block(118, 119, 9, 10); L.goal(125, 10);
+    }) },
+    { name: '1-3 トゲのとりで', map: makeLevel(150, L => {
+      L.ground(0, 14, 2); L.start(2, 11); L.coins(5, 9, 10);
+      L.ground(15, 30, 2); L.spikes(18, 19, 11); L.spikes(24, 25, 11); L.enemy(28, 11);
+      L.block(21, 22, 10, 10); L.coins(21, 22, 9);
+      L.plat(33, 35, 10); L.plat(38, 40, 8); L.plat(43, 45, 10); L.coins(38, 40, 7);
+      L.ground(48, 62, 2); L.check(49, 11); L.block(53, 55, 10, 11); L.enemy(58, 11); L.spikes(60, 61, 11);
+      L.block(57, 58, 8, 8); L.coin(57, 7); L.coin(58, 7);
+      L.ground(64, 80, 2); L.spikes(64, 80, 11);
+      L.plat(65, 67, 10); L.plat(70, 72, 9); L.plat(75, 77, 10); L.coins(70, 72, 8);
+      L.ground(81, 96, 3); L.check(82, 10); L.enemy(88, 10); L.enemy(92, 10); L.block(90, 90, 9, 10);
+      L.ground(99, 101, 4); L.ground(104, 106, 5); L.coins(104, 106, 8);
+      L.ground(109, 125, 3); L.spikes(113, 114, 10); L.spikes(119, 120, 10); L.plat(112, 115, 9); L.plat(118, 121, 9); L.coins(112, 121, 8);
+      L.enemy(123, 10);
+      L.ground(128, 149, 2); L.check(129, 11); L.enemy(135, 11); L.enemy(139, 11);
+      L.block(141, 142, 10, 11); L.block(143, 144, 9, 11); L.goal(147, 11);
+    }) },
+  ];
+
+  // ---------- canvas ----------
+  let W, H, DPR, T;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR;
+    T = Math.max(22, Math.min(H / 9.5, W / 11));
+  }
+  addEventListener('resize', resize); resize();
+
+  // ---------- sound ----------
+  let ac = null;
+  function tone(f, d = .08, type = 'square', v = .04, delay = 0, f2) {
+    if (!ac) return;
+    const t = ac.currentTime + delay, o = ac.createOscillator(), gn = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+    gn.gain.setValueAtTime(v, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(gn).connect(ac.destination); o.start(t); o.stop(t + d + .02);
+  }
+  const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+
+  // ---------- input ----------
+  // left 55% = relative drag for running; right side = jump (hold for height)
+  const run = { id: null, ox: 0, x: 0 };
+  const jumpPtrs = new Set();
+  let jumpPressed = false, jumpBuffer = 0;
+  const SPLIT = .55;
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch {}
+    if (e.clientX < W * SPLIT && run.id === null) { run.id = e.pointerId; run.ox = run.x = e.clientX; }
+    else { jumpPtrs.add(e.pointerId); jumpBuffer = .12; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (e.pointerId !== run.id) return;
+    run.x = e.clientX;
+    const max = 50; if (run.x - run.ox > max) run.ox = run.x - max; if (run.ox - run.x > max) run.ox = run.x + max;
+  });
+  const up = e => { if (e.pointerId === run.id) run.id = null; jumpPtrs.delete(e.pointerId); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  const keys = {};
+  addEventListener('keydown', e => { if (!keys[e.key] && (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'z')) jumpBuffer = .12; keys[e.key] = true; });
+  addEventListener('keyup', e => keys[e.key] = false);
+  function moveInput() {
+    let x = 0;
+    if (run.id !== null) { const d = run.x - run.ox; if (Math.abs(d) > 8) x = Math.max(-1, Math.min(1, d / 34)); }
+    if (keys.ArrowLeft || keys.a) x = -1; if (keys.ArrowRight || keys.d) x = 1;
+    return x;
+  }
+  const jumpHeld = () => jumpPtrs.size > 0 || keys[' '] || keys.ArrowUp || keys.z;
+
+  // ---------- game state ----------
+  let lvIdx = 0, map, LW, p, enemies, coinsGot, particles, state = 'title', last = 0, cam = { x: 0, y: 0 }, check;
+  let runTime = 0, runCoins = 0, runMiss = 0, stTime = 0, stMiss = 0, totalCoinsInLevel = 0;
+  const tile = (x, y) => (y < 0 || x < 0 || x >= LW) ? '.' : y >= ROWS ? '.' : map[y][x];
+  const solid = c => c === '#';
+
+  function loadLevel(i, keepCheck) {
+    lvIdx = i;
+    const src = LEVELS[i].map;
+    map = src.map(r => r.split('')); LW = map[0].length;
+    enemies = []; coinsGot = 0; particles = []; totalCoinsInLevel = 0;
+    let sx = 2, sy = 10;
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < LW; x++) {
+      const c = map[y][x];
+      if (c === 'P') { sx = x; sy = y; map[y][x] = '.'; }
+      if (c === 'e') { enemies.push({ x: x + .1, y: y + .2, w: .8, h: .8, vx: -1.6, vy: 0, alive: true, sq: 0 }); map[y][x] = '.'; }
+      if (c === 'o') totalCoinsInLevel++;
+    }
+    if (!keepCheck) check = { x: sx, y: sy };
+    spawnPlayer();
+    stTime = 0; stMiss = 0;
+    $('hStage').textContent = LEVELS[i].name.split(' ')[0];
+  }
+  function spawnPlayer() {
+    p = { x: check.x + .15, y: check.y + .05, w: .7, h: .9, vx: 0, vy: 0, onGround: false, coyote: 0, face: 1, sx: 1, sy: 1, dead: 0, runAnim: 0, inv: .5 };
+    cam.x = p.x * T - W * .4;
+  }
+
+  // ---------- physics ----------
+  const GRAV = 40, JUMP_V = 14.2, RUN = 7.2, ACC = 55, AIR_ACC = 35, MAXFALL = 18;
+  function collideX(o) {
+    const y0 = Math.floor(o.y), y1 = Math.floor(o.y + o.h - .001);
+    if (o.vx > 0) { const x = Math.floor(o.x + o.w); for (let y = y0; y <= y1; y++) if (solid(tile(x, y))) { o.x = x - o.w; o.vx = 0; return 1; } }
+    else if (o.vx < 0) { const x = Math.floor(o.x); for (let y = y0; y <= y1; y++) if (solid(tile(x, y))) { o.x = x + 1; o.vx = 0; return -1; } }
+    return 0;
+  }
+  function collideY(o, prevBottom) {
+    const x0 = Math.floor(o.x), x1 = Math.floor(o.x + o.w - .001);
+    o.onGround = false;
+    if (o.vy > 0) {
+      const y = Math.floor(o.y + o.h);
+      for (let x = x0; x <= x1; x++) {
+        const c = tile(x, y);
+        if (solid(c) || (c === '-' && prevBottom <= y + .001)) { o.y = y - o.h; o.vy = 0; o.onGround = true; return; }
+      }
+    } else if (o.vy < 0) {
+      const y = Math.floor(o.y);
+      for (let x = x0; x <= x1; x++) if (solid(tile(x, y))) { o.y = y + 1; o.vy = 0; return; }
+    }
+  }
+  function overlapsTile(o, ch, shrink = .15) {
+    const x0 = Math.floor(o.x + shrink), x1 = Math.floor(o.x + o.w - shrink), y0 = Math.floor(o.y + shrink), y1 = Math.floor(o.y + o.h - .01);
+    const hits = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (tile(x, y) === ch) hits.push([x, y]);
+    return hits;
+  }
+
+  function puff(x, y, col, n = 8, sp = 4) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * 7, v = Math.random() * sp; particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, life: .5 + Math.random() * .3, col }); }
+  }
+  function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 1650); }
+
+  function die() {
+    if (p.dead) return;
+    p.dead = 1; stMiss++; runMiss++;
+    tone(400, .4, 'square', .05, 0, 80); buzz([60, 40, 60]);
+    puff(p.x + p.w / 2, p.y + p.h / 2, '#ffffff', 16, 7);
+  }
+
+  function update(dt) {
+    stTime += dt; runTime += dt;
+    jumpBuffer -= dt;
+    if (p.dead) {
+      p.dead += dt;
+      if (p.dead > .9) spawnPlayer();
+      updateParticles(dt); return;
+    }
+    const mx = moveInput();
+    const acc = p.onGround ? ACC : AIR_ACC;
+    const target = mx * RUN;
+    if (p.vx < target) p.vx = Math.min(target, p.vx + acc * dt); else if (p.vx > target) p.vx = Math.max(target, p.vx - acc * dt);
+    if (mx) p.face = Math.sign(mx);
+
+    p.coyote = p.onGround ? .1 : p.coyote - dt;
+    if (jumpBuffer > 0 && p.coyote > 0) {
+      p.vy = -JUMP_V; p.coyote = 0; jumpBuffer = 0; p.onGround = false;
+      p.sx = .75; p.sy = 1.3; tone(520, .1, 'square', .035, 0, 900);
+      puff(p.x + p.w / 2, p.y + p.h, '#ffffff', 5, 2);
+    }
+    // variable jump: releasing early cuts the rise
+    const g = (!jumpHeld() && p.vy < 0) ? GRAV * 2.4 : GRAV;
+    p.vy = Math.min(MAXFALL, p.vy + g * dt);
+
+    const wasGround = p.onGround;
+    p.x += p.vx * dt; if (p.x < 0) { p.x = 0; p.vx = 0; } collideX(p);
+    const prevBottom = p.y + p.h;
+    p.y += p.vy * dt; collideY(p, prevBottom);
+    if (!wasGround && p.onGround) { p.sx = 1.25; p.sy = .8; puff(p.x + p.w / 2, p.y + p.h, '#ffffff', 4, 2); }
+    p.sx += (1 - p.sx) * Math.min(1, dt * 12); p.sy += (1 - p.sy) * Math.min(1, dt * 12);
+    p.runAnim += Math.abs(p.vx) * dt;
+    p.inv -= dt;
+
+    if (p.y > ROWS + 2) die();
+    if (overlapsTile(p, '^', .2).length) die();
+    for (const [x, y] of overlapsTile(p, 'o', 0)) { map[y][x] = '.'; coinsGot++; runCoins++; tone(988, .06, 'square', .04); tone(1319, .12, 'square', .04, .06); puff(x + .5, y + .5, '#ffc93c', 6, 3); }
+    for (const [x, y] of overlapsTile(p, 'C', 0)) { if (check.x !== x || check.y !== y) { check = { x, y }; toast('チェックポイント'); tone(660, .1, 'triangle', .05); tone(990, .15, 'triangle', .05, .1); } }
+    if (overlapsTile(p, 'G', 0).length) return clearStage();
+
+    // enemies
+    for (const e of enemies) {
+      if (!e.alive) { e.sq += dt; continue; }
+      if (Math.abs(e.x - p.x) > 20) continue;
+      e.vy = Math.min(MAXFALL, e.vy + GRAV * dt);
+      e.x += e.vx * dt;
+      if (collideX(e)) e.vx = -(e.lastDir || -1) * 1.6;
+      const pb = e.y + e.h; e.y += e.vy * dt; collideY(e, pb);
+      // turn at ledges
+      if (e.onGround) {
+        const ahead = e.vx > 0 ? Math.floor(e.x + e.w + .05) : Math.floor(e.x - .05);
+        const below = tile(ahead, Math.floor(e.y + e.h + .1));
+        if (!solid(below) && below !== '-') e.vx = -e.vx;
+      }
+      e.lastDir = Math.sign(e.vx);
+      if (e.y > ROWS + 2) e.alive = false;
+      // player contact
+      if (p.x < e.x + e.w && p.x + p.w > e.x && p.y < e.y + e.h && p.y + p.h > e.y) {
+        if (p.vy > 0 && p.y + p.h - e.y < .5) {
+          e.alive = false; e.sq = 0; p.vy = jumpHeld() ? -JUMP_V * 1.05 : -JUMP_V * .7;
+          tone(300, .1, 'square', .05, 0, 120); buzz(20); puff(e.x + .4, e.y + .4, '#7a4b2a', 8, 4);
+        } else if (p.inv <= 0) die();
+      }
+    }
+    updateParticles(dt);
+  }
+  function updateParticles(dt) {
+    for (const q of particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 10 * dt; q.life -= dt; }
+    particles = particles.filter(q => q.life > 0);
+  }
+
+  function clearStage() {
+    state = 'clear';
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, .15, 'square', .045, i * .1));
+    const lastStage = lvIdx === LEVELS.length - 1;
+    $('cTitle').textContent = lastStage ? 'ぜんぶクリア！' : 'ステージクリア！';
+    $('cTime').textContent = (lastStage ? runTime : stTime).toFixed(1) + '秒';
+    $('cCoin').textContent = lastStage ? runCoins : `${coinsGot}/${totalCoinsInLevel}`;
+    $('cMiss').textContent = lastStage ? runMiss : stMiss;
+    if (lastStage) {
+      const nb = bestTime == null || runTime < bestTime;
+      if (nb) { bestTime = runTime; store.set('hj_best', bestTime); }
+      $('cBest').textContent = nb ? '最速記録を更新！' : `最速記録 ${bestTime.toFixed(1)}秒`;
+      $('nextBtn').textContent = 'もう一回';
+    } else { $('cBest').textContent = ''; $('nextBtn').textContent = '次のステージへ'; }
+    setTimeout(() => { $('clearOv').hidden = false; }, 500);
+  }
+
+  // ---------- drawing ----------
+  function drawBackground(camX) {
+    const gr = ctx.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, '#8fd3f4'); gr.addColorStop(1, '#e6f6ff');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    // clouds (parallax .2)
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (let i = 0; i < 8; i++) {
+      const x = ((i * 380 - camX * .2) % (W + 400) + W + 400) % (W + 400) - 200, y = 40 + (i * 53) % (H * .35);
+      ctx.beginPath(); ctx.arc(x, y, 26, 0, 7); ctx.arc(x + 28, y - 10, 32, 0, 7); ctx.arc(x + 60, y, 24, 0, 7); ctx.fill();
+    }
+    // hills (parallax .45)
+    ctx.fillStyle = '#9ed99b';
+    const base = H * .78;
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W + 20; x += 20) { const wx = x + camX * .45; ctx.lineTo(x, base - Math.sin(wx / 160) * 40 - Math.sin(wx / 63) * 12); }
+    ctx.lineTo(W, H); ctx.fill();
+  }
+  function drawTiles(ox, oy) {
+    const x0 = Math.max(0, Math.floor(-ox / T) - 1), x1 = Math.min(LW - 1, Math.ceil((W - ox) / T) + 1);
+    for (let y = 0; y < ROWS; y++) for (let x = x0; x <= x1; x++) {
+      const c = map[y][x], px = ox + x * T, py = oy + y * T;
+      if (c === '#') {
+        const top = tile(x, y - 1) !== '#';
+        ctx.fillStyle = '#b07a4f'; ctx.fillRect(px, py, T + .5, T + .5);
+        ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(px + T * .2, py + T * .55, T * .15, T * .15); ctx.fillRect(px + T * .65, py + T * .3, T * .12, T * .12);
+        if (top) { ctx.fillStyle = '#5cbf4a'; ctx.fillRect(px, py, T + .5, T * .28); ctx.fillStyle = '#4aa83a'; ctx.fillRect(px, py + T * .22, T + .5, T * .08); }
+      } else if (c === '-') {
+        ctx.fillStyle = '#fffaf0'; ctx.fillRect(px, py, T + .5, T * .3);
+        ctx.fillStyle = '#d7e6ef'; ctx.fillRect(px, py + T * .22, T + .5, T * .08);
+      } else if (c === '^') {
+        ctx.fillStyle = '#7d8aa0';
+        for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(px + k * T / 3, py + T); ctx.lineTo(px + (k + .5) * T / 3, py + T * .35); ctx.lineTo(px + (k + 1) * T / 3, py + T); ctx.fill(); }
+      } else if (c === 'o') {
+        const s = Math.abs(Math.sin(performance.now() / 300 + x));
+        ctx.fillStyle = '#ffc93c'; ctx.beginPath(); ctx.ellipse(px + T / 2, py + T / 2, T * .28 * (.3 + .7 * s), T * .3, 0, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#e09b10'; ctx.lineWidth = 2; ctx.stroke();
+      } else if (c === 'C' || c === 'G') {
+        const isG = c === 'G', active = !isG && check.x === x && check.y === y;
+        ctx.fillStyle = '#5b6578'; ctx.fillRect(px + T * .45, py - (isG ? T * 2 : T * .6), T * .1, T * (isG ? 3 : 1.6));
+        ctx.fillStyle = isG ? '#ff7a3d' : active ? '#4aa83a' : '#c9d3dd';
+        const fy = py - (isG ? T * 2 : T * .6);
+        ctx.beginPath(); ctx.moveTo(px + T * .55, fy); ctx.lineTo(px + T * (isG ? 1.4 : 1.1), fy + T * .3); ctx.lineTo(px + T * .55, fy + T * .6); ctx.fill();
+      }
+    }
+  }
+  function drawEnemy(e, ox, oy) {
+    const px = ox + e.x * T, py = oy + e.y * T, w = e.w * T, h = e.h * T;
+    if (!e.alive) {
+      if (e.sq > .5) return;
+      ctx.globalAlpha = 1 - e.sq * 2; ctx.fillStyle = '#7a4b2a'; ctx.fillRect(px, py + h * .7, w, h * .3); ctx.globalAlpha = 1; return;
+    }
+    const t = performance.now() / 120;
+    ctx.fillStyle = '#7a4b2a';
+    for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + t * .1; ctx.beginPath(); ctx.moveTo(px + w / 2 + Math.cos(a) * w * .35, py + h * .5 + Math.sin(a) * h * .35); ctx.lineTo(px + w / 2 + Math.cos(a + .2) * w * .62, py + h * .5 + Math.sin(a + .2) * h * .62); ctx.lineTo(px + w / 2 + Math.cos(a + .45) * w * .35, py + h * .5 + Math.sin(a + .45) * h * .35); ctx.fill(); }
+    ctx.fillStyle = '#9a6238'; ctx.beginPath(); ctx.arc(px + w / 2, py + h * .5, w * .42, 0, 7); ctx.fill();
+    const d = e.vx > 0 ? 1 : -1;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px + w / 2 + d * w * .12 - w * .1, py + h * .42, w * .1, 0, 7); ctx.arc(px + w / 2 + d * w * .12 + w * .1, py + h * .42, w * .1, 0, 7); ctx.fill();
+    ctx.fillStyle = '#23324a'; ctx.beginPath(); ctx.arc(px + w / 2 + d * w * .16 - w * .1, py + h * .43, w * .05, 0, 7); ctx.arc(px + w / 2 + d * w * .16 + w * .1, py + h * .43, w * .05, 0, 7); ctx.fill();
+    ctx.fillStyle = '#23324a'; const step = Math.sin(t) * w * .08;
+    ctx.fillRect(px + w * .25 + step, py + h * .85, w * .18, h * .15); ctx.fillRect(px + w * .57 - step, py + h * .85, w * .18, h * .15);
+  }
+  function drawPlayer(ox, oy) {
+    if (p.dead) return;
+    if (p.inv > 0 && Math.floor(p.inv * 20) % 2) return;
+    const cx = ox + (p.x + p.w / 2) * T, by = oy + (p.y + p.h) * T;
+    ctx.save(); ctx.translate(cx, by); ctx.scale(p.sx * p.face, p.sy);
+    const u = T;
+    const legA = p.onGround ? Math.sin(p.runAnim * 2.2) * .12 : .1;
+    ctx.fillStyle = '#23324a';
+    ctx.fillRect(-u * .22 + legA * u, -u * .14, u * .16, u * .14); ctx.fillRect(u * .06 - legA * u, -u * .14, u * .16, u * .14);
+    // body
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(0, -u * .42, u * .36, u * .32, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#23324a'; ctx.lineWidth = Math.max(1.5, u * .05); ctx.stroke();
+    // ears
+    const earTilt = p.onGround ? 0 : -p.vy * .015;
+    for (const s of [-1, 1]) {
+      ctx.save(); ctx.translate(s * u * .14, -u * .68); ctx.rotate(s * .18 + earTilt);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(0, -u * .22, u * .09, u * .25, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffb3c1'; ctx.beginPath(); ctx.ellipse(0, -u * .2, u * .04, u * .16, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    // face
+    ctx.fillStyle = '#23324a'; ctx.beginPath(); ctx.arc(u * .1, -u * .47, u * .045, 0, 7); ctx.arc(u * .24, -u * .47, u * .045, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffb3c1'; ctx.beginPath(); ctx.arc(u * .3, -u * .37, u * .05, 0, 7); ctx.fill();
+    // scarf
+    ctx.fillStyle = '#ff7a3d'; ctx.fillRect(-u * .3, -u * .3, u * .6, u * .09);
+    ctx.fillRect(-u * .38 - Math.abs(p.vx) * u * .02, -u * .3, u * .14, u * .2);
+    ctx.restore();
+  }
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const levelH = ROWS * T;
+    // camera
+    const tx = (p.x + p.w / 2) * T - W * .4 + p.face * T * .8;
+    cam.x += (tx - cam.x) * .12; cam.x = Math.max(0, Math.min(LW * T - W, cam.x));
+    let oy;
+    if (levelH <= H) oy = Math.min(H - levelH, (H - levelH) * .55);
+    else { const ty = (p.y + p.h / 2) * T - H * .55; cam.y += (ty - cam.y) * .15; cam.y = Math.max(0, Math.min(levelH - H, cam.y)); oy = -cam.y; }
+    const ox = -cam.x;
+    drawBackground(cam.x);
+    if (levelH < H) { ctx.fillStyle = '#8a5d3b'; ctx.fillRect(0, oy + levelH, W, H - oy - levelH); }
+    drawTiles(ox, oy);
+    for (const e of enemies) drawEnemy(e, ox, oy);
+    drawPlayer(ox, oy);
+    for (const q of particles) { ctx.globalAlpha = Math.max(0, q.life * 2); ctx.fillStyle = q.col; ctx.fillRect(ox + q.x * T - 3, oy + q.y * T - 3, 6, 6); }
+    ctx.globalAlpha = 1;
+    // run stick indicator
+    if (run.id !== null) {
+      const ry = H - 90;
+      ctx.fillStyle = 'rgba(255,250,240,.5)'; ctx.fillRect(run.ox - 50, ry - 3, 100, 6);
+      ctx.fillStyle = 'rgba(35,50,74,.45)'; ctx.beginPath(); ctx.arc(run.x, ry, 16, 0, 7); ctx.fill();
+    }
+  }
+  function hud() {
+    $('hCoin').textContent = runCoins;
+    $('hTime').textContent = runTime.toFixed(1);
+  }
+
+  function frame(ts) {
+    const dt = Math.min(1 / 30, (ts - last) / 1000); last = ts;
+    if (state === 'play') { update(dt); hud(); }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  function newRun() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    if (ac && ac.state === 'suspended') ac.resume();
+    runTime = 0; runCoins = 0; runMiss = 0;
+    loadLevel(0); state = 'play';
+    ['startOv', 'pauseOv', 'clearOv'].forEach(id => $(id).hidden = true);
+    toast(LEVELS[0].name); last = performance.now();
+  }
+  function pause() { if (state !== 'play') return; state = 'pause'; $('pauseOv').hidden = false; }
+  $('startBtn').onclick = newRun;
+  $('pauseBtn').onclick = pause;
+  $('resumeBtn').onclick = () => { $('pauseOv').hidden = true; state = 'play'; last = performance.now(); };
+  $('restartBtn').onclick = () => { $('pauseOv').hidden = true; loadLevel(lvIdx); state = 'play'; last = performance.now(); };
+  $('quitBtn').onclick = () => { $('pauseOv').hidden = true; state = 'title'; $('startOv').hidden = false; };
+  $('cTitleBtn').onclick = () => { $('clearOv').hidden = true; state = 'title'; $('startOv').hidden = false; };
+  $('nextBtn').onclick = () => {
+    $('clearOv').hidden = true;
+    if (lvIdx === LEVELS.length - 1) return newRun();
+    loadLevel(lvIdx + 1); state = 'play'; toast(LEVELS[lvIdx].name); last = performance.now();
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  loadLevel(0);
+  requestAnimationFrame(frame);
+})();
+</script>
