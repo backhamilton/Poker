@@ -411,7 +411,7 @@ h2 { font-size: 32px; }
   }
 
   function frame(ts) {
-    const dt = Math.min(.05, (ts - last) / 1000); last = ts;
+    const dt = Math.max(0, Math.min(.05, (ts - last) / 1000)); last = ts;
     if (running) { update(dt); hud(); }
     else if (g && g.over) { for (const q of g.parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; } g.shake = Math.max(0, g.shake - dt * 30); }
     draw();

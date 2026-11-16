@@ -508,7 +508,7 @@ h2 { font-size: 34px; }
   }
 
   function frame(ts) {
-    const dt = Math.min(1 / 30, (ts - last) / 1000); last = ts;
+    const dt = Math.max(0, Math.min(1 / 30, (ts - last) / 1000)); last = ts;
     if (state === 'play') { update(dt); hud(); }
     draw();
     requestAnimationFrame(frame);
