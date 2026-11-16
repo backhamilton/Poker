@@ -2,16 +2,17 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
 <style>
-/* Layout: full-bleed canvas arena with a follow camera; HUD top (time, HP, kills), 5-slot card hand docked at the bottom. Single dark look by choice. */
+/* Layout: full-bleed canvas arena with a follow camera; HUD + XP bar on top, 5-slot hand docked at the bottom, level-up card draft as a modal. Single dark look by choice. */
 :root {
   --felt: #0f3a2e;
   --felt-dark: #0a2720;
   --ink: #f4efe2;
   --muted: #a9c2b6;
   --gold: #f2b33d;
+  --xp: #59d1ff;
   --hp: #ff5a6a;
   --card: #fbf7ee;
-  --s: #1d1d24; --h: #d8302f; --d: #1f6fd1; --c: #1f9a4f;
+  --s: #1d1d24; --h: #d8302f; --d: #1f6fd1; --c: #1f9a4f; --w: #8a3fd1;
   --font-display: "Bungee", "Arial Black", system-ui, sans-serif;
   --font-body: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
   color-scheme: dark;
@@ -20,44 +21,55 @@
 html, body { height: 100%; margin: 0; }
 body { background: var(--felt-dark); color: var(--ink); font-family: var(--font-body); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
 #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-.hud {
+
+.top {
   position: fixed; left: 0; right: 0; top: 0; z-index: 2; pointer-events: none;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px;
-  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 6px;
 }
+.xpbar { height: 8px; border-radius: 4px; background: rgba(0,0,0,.35); overflow: hidden; position: relative; }
+.xpbar i { position: absolute; inset: 0; background: var(--xp); transform-origin: left; transform: scaleX(0); transition: transform .12s; }
+.hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; }
 .lbl { font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 800; }
 .val { font-family: var(--font-display); font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .hud .mid { text-align: center; }
 .hud .right { text-align: right; }
-.hearts { font-size: 16px; letter-spacing: 1px; color: var(--hp); line-height: 1.4; }
+.hearts { font-size: 16px; letter-spacing: 1px; color: var(--hp); line-height: 1.3; }
+.lvtag { font-family: var(--font-display); font-size: 13px; color: var(--xp); }
 .pausebtn { pointer-events: auto; appearance: none; border: 2px solid rgba(255,255,255,.2); background: rgba(0,0,0,.25); color: var(--ink); border-radius: 10px; font: 800 13px var(--font-body); padding: 6px 10px; margin-top: 4px; cursor: pointer; }
+.bossbar { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.bossbar .nm { font-family: var(--font-display); font-size: 13px; color: var(--gold); letter-spacing: .06em; }
+.bossbar .track { width: min(100%, 360px); height: 8px; border-radius: 4px; background: rgba(0,0,0,.4); overflow: hidden; }
+.bossbar .fill { height: 100%; background: var(--hp); transform-origin: left; }
+
 .handbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; pointer-events: none;
   padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
-.handinfo { font-size: 12px; font-weight: 800; color: var(--muted); min-height: 16px; text-align: center; }
+.handinfo { font-size: 12px; font-weight: 800; color: var(--muted); min-height: 16px; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .handinfo b { color: var(--gold); }
-.slots { display: grid; grid-template-columns: repeat(5, 46px); gap: 6px; pointer-events: auto; }
-.slot {
-  appearance: none; border: 2px dashed rgba(255,255,255,.25); background: rgba(0,0,0,.2); border-radius: 7px;
-  height: 62px; padding: 0; position: relative; font: inherit; color: inherit; cursor: pointer;
+.slots { display: grid; grid-template-columns: repeat(5, 42px); gap: 6px; }
+.mini {
+  height: 56px; border-radius: 7px; position: relative;
+  border: 2px dashed rgba(255,255,255,.22); background: rgba(0,0,0,.2); box-sizing: border-box;
 }
-.slot.has { background: var(--card); border: 0; box-shadow: 0 3px 8px rgba(0,0,0,.4); }
-.slot .rk { position: absolute; left: 5px; top: 3px; font-family: var(--font-display); font-size: 17px; line-height: 1; }
-.slot .st { position: absolute; right: 4px; bottom: 2px; font-size: 24px; line-height: 1; }
-.slot[data-s="s"] { color: var(--s); } .slot[data-s="h"] { color: var(--h); } .slot[data-s="d"] { color: var(--d); } .slot[data-s="c"] { color: var(--c); }
-.slot.has::after { content: "×"; position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; background: #333; color: #fff; font: 800 12px/18px var(--font-body); }
-.slot:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.mini.has { background: var(--card); border: 0; box-shadow: 0 3px 8px rgba(0,0,0,.4); }
+.mini .rk { position: absolute; left: 4px; top: 3px; font-family: var(--font-display); font-size: 15px; line-height: 1; }
+.mini .st { position: absolute; right: 3px; bottom: 2px; font-size: 21px; line-height: 1; }
+[data-s="s"] { color: var(--s); } [data-s="h"] { color: var(--h); } [data-s="d"] { color: var(--d); } [data-s="c"] { color: var(--c); } [data-s="w"] { color: var(--w); }
+
 .banner {
-  position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
-  text-align: center; animation: ban 1.8s ease-out forwards; width: max-content; max-width: calc(100vw - 32px);
+  position: fixed; left: 50%; top: 32%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
+  text-align: center; animation: ban 1.9s ease-out forwards; width: max-content; max-width: calc(100vw - 32px);
 }
 .banner b { display: block; font-family: var(--font-display); font-size: 28px; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.5); }
-.banner span { display: block; font-weight: 800; font-size: 15px; text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+.banner span { display: block; font-weight: 800; font-size: 15px; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
+.banner.warn b { color: var(--hp); }
 @keyframes ban { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 80% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+
 .overlay {
   position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
   background: rgba(5, 20, 16, .86); backdrop-filter: blur(3px);
@@ -65,55 +77,109 @@ body { background: var(--felt-dark); color: var(--ink); font-family: var(--font-
   padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
 }
-.panel { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.panel { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
 h1, h2 { margin: 0; font-family: var(--font-display); font-weight: 400; color: var(--gold); line-height: 1.05; text-wrap: balance; }
 h1 { font-size: clamp(30px, 10vw, 44px); }
 h1 small { display: block; font-family: var(--font-body); font-weight: 800; font-size: 14px; color: var(--ink); letter-spacing: .2em; margin-top: 6px; }
 h2 { font-size: 30px; }
 .panel p { margin: 0; font-size: 14px; line-height: 1.7; }
-table.pay { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; }
+.steps { display: grid; gap: 6px; text-align: left; font-size: 13px; line-height: 1.55; background: rgba(255,255,255,.06); border-radius: 12px; padding: 12px 14px; }
+.steps b { color: var(--gold); }
+details { text-align: left; font-size: 12.5px; background: rgba(255,255,255,.04); border-radius: 10px; padding: 8px 12px; }
+summary { cursor: pointer; font-weight: 800; color: var(--muted); }
+table.pay { width: 100%; border-collapse: collapse; margin-top: 6px; }
 table.pay td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
 table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--gold); }
 .btn { appearance: none; border: 2px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: var(--ink); border-radius: 12px; font: 800 15px var(--font-body); padding: 12px; cursor: pointer; }
 .btn.primary { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-size: 18px; padding: 15px; }
-.btn:focus-visible, .pausebtn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn:focus-visible, .pausebtn:focus-visible, .opt:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .big { font-family: var(--font-display); font-size: 52px; color: var(--gold); line-height: 1; font-variant-numeric: tabular-nums; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .stats div { background: rgba(255,255,255,.06); border-radius: 10px; padding: 8px; }
 .stats .v { font-weight: 800; font-size: 15px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.buildlist { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.buildlist { font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+
+/* level-up draft */
+#lvOv { background: rgba(5, 20, 16, .78); }
+.lvtitle { font-family: var(--font-display); color: var(--xp); font-size: 30px; }
+.opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.opt {
+  appearance: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0;
+  display: flex; flex-direction: column; gap: 6px; align-items: stretch; background: none;
+  animation: optin .25s ease-out backwards;
+}
+.opt:nth-child(2) { animation-delay: .05s; } .opt:nth-child(3) { animation-delay: .1s; }
+@keyframes optin { from { transform: translateY(16px) rotate(-4deg); opacity: 0; } }
+.opt .face {
+  aspect-ratio: 5 / 7; max-width: 100%; background: var(--card); border-radius: 10px; position: relative;
+  box-shadow: 0 4px 0 #d9cfbb, 0 10px 18px rgba(0,0,0,.4); container-type: inline-size;
+}
+.opt .face .rk { position: absolute; left: 8%; top: 5%; font-family: var(--font-display); font-size: 30cqw; line-height: 1; }
+.opt .face .st { position: absolute; right: 8%; bottom: 4%; font-size: 48cqw; line-height: 1; }
+.opt .bonus { font-size: 11.5px; color: var(--muted); font-weight: 800; }
+.opt .prev { font-size: 12px; font-weight: 800; min-height: 2.6em; line-height: 1.3; }
+.opt .prev.done { color: var(--gold); }
+.opt.help .face { box-shadow: 0 4px 0 #d9cfbb, 0 0 0 3px var(--xp), 0 10px 18px rgba(0,0,0,.4); }
+.lvhand { display: flex; justify-content: center; gap: 6px; }
+.lvhand .mini { width: 42px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 </style>
 
 <canvas id="cv"></canvas>
-<div class="hud">
-  <div><div class="lbl">HP</div><div class="hearts" id="hHp"></div></div>
-  <div class="mid"><div class="lbl">のこり</div><div class="val" id="hTime">3:00</div></div>
-  <div class="right"><div class="lbl">撃破</div><div class="val" id="hKill">0</div><button class="pausebtn" id="pauseBtn" type="button">II</button></div>
+<div class="top">
+  <div class="xpbar"><i id="xpFill"></i></div>
+  <div class="hud">
+    <div><div class="lbl">HP <span class="lvtag" id="hLv">Lv1</span></div><div class="hearts" id="hHp"></div></div>
+    <div class="mid"><div class="lbl" id="hTimeLbl">ボスまで</div><div class="val" id="hTime">3:00</div></div>
+    <div class="right"><div class="lbl">撃破</div><div class="val" id="hKill">0</div><button class="pausebtn" id="pauseBtn" type="button">II</button></div>
+  </div>
+  <div class="bossbar" id="bossBar" hidden><div class="nm" id="bossName">KING</div><div class="track"><div class="fill" id="bossFill"></div></div></div>
 </div>
 <div class="handbar">
-  <div class="handinfo" id="handInfo">敵が落とすカードを5枚集めると役が発動</div>
+  <div class="handinfo" id="handInfo"></div>
   <div class="slots" id="slots"></div>
 </div>
 
 <div class="overlay" id="startOv">
   <div class="panel">
     <h1>CARD SURVIVOR<small>トランプ・サバイバー</small></h1>
-    <p>3分間生き残れ。攻撃は自動。<b>ドラッグで移動</b>して敵をかわし、敵が落とすトランプを拾おう。手札が5枚そろうと<b>役に応じて強化</b>される。いらないカードはタップで捨てられる。</p>
-    <table class="pay">
-      <tr><td>ロイヤル/ストフラ</td><td>全部まとめて大強化＋画面の敵を一掃</td></tr>
-      <tr><td>フォーカード</td><td>周囲に衝撃波（定期発動・重ねると強化）</td></tr>
-      <tr><td>フルハウス</td><td>最大HP＋1して全回復</td></tr>
-      <tr><td>フラッシュ</td><td>体のまわりを回るカード＋1</td></tr>
-      <tr><td>ストレート</td><td>移動速度UP＋弾が敵を1体多く貫通</td></tr>
-      <tr><td>スリーカード</td><td>攻撃力＋30%</td></tr>
-      <tr><td>ツーペア</td><td>同時に撃つ弾＋1</td></tr>
-      <tr><td>ワンペア</td><td>連射速度＋15%</td></tr>
-      <tr><td>ブタ</td><td>攻撃力＋8%（残念賞）</td></tr>
-    </table>
+    <div class="steps">
+      <div><b>ドラッグで移動</b>。攻撃は自動。</div>
+      <div>敵が落とす<b>チップ</b>を集めてレベルアップ。毎回<b>3枚から1枚</b>選んで手札へ。</div>
+      <div>手札が5枚そろうと<b>役に応じて大強化</b>。強い役を狙って選ぼう。</div>
+      <div>1分ごとにボス。3分で<b>ジョーカー</b>が登場。倒せばクリア。</div>
+      <div>真ん中の<b>白い点</b>だけが弾の当たり判定。弾をギリギリでかわすと<b>かすり</b>で経験値。</div>
+    </div>
+    <details>
+      <summary>役と効果の一覧</summary>
+      <table class="pay">
+        <tr><td>ロイヤル/ストフラ</td><td>全部まとめて強化＋画面の敵を一掃</td></tr>
+        <tr><td>フォーカード</td><td>周囲に衝撃波（定期発動）</td></tr>
+        <tr><td>フルハウス</td><td>最大HP＋2・全回復</td></tr>
+        <tr><td>フラッシュ</td><td>体のまわりを回るカード＋1</td></tr>
+        <tr><td>ストレート</td><td>移動・弾速UP＋貫通＋1</td></tr>
+        <tr><td>スリーカード</td><td>攻撃力＋35%</td></tr>
+        <tr><td>ツーペア</td><td>同時に撃つ弾＋1</td></tr>
+        <tr><td>ワンペア</td><td>連射＋20%</td></tr>
+        <tr><td>ブタ</td><td>攻撃力＋10%・HP1回復</td></tr>
+      </table>
+      <p style="font-size:12px;margin-top:6px">カードのスートにも小さな効果：♠攻撃 ♥回復 ♦連射 ♣移動と吸い寄せ範囲。宝箱からは何にでもなる<b>ワイルドカード</b>。</p>
+    </details>
     <button class="btn primary" id="startBtn" type="button">スタート</button>
   </div>
 </div>
+
+<div class="overlay" id="lvOv" hidden>
+  <div class="panel">
+    <div class="lvtitle" id="lvTitle">LEVEL UP!</div>
+    <div class="lvhand" id="lvHand"></div>
+    <div class="opts" id="opts"></div>
+    <button class="btn" id="rerollBtn" type="button">引き直す（残り2）</button>
+  </div>
+</div>
+
 <div class="overlay" id="pauseOv" hidden>
   <div class="panel">
     <h2>PAUSE</h2>
@@ -130,10 +196,12 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     <div class="stats">
       <div><div class="lbl">生存時間</div><div class="v" id="eTime">0</div></div>
       <div><div class="lbl">撃破数</div><div class="v" id="eKill">0</div></div>
+      <div><div class="lbl">レベル</div><div class="v" id="eLv">1</div></div>
+      <div><div class="lbl">かすり</div><div class="v" id="eGraze">0</div></div>
       <div><div class="lbl">発動した役</div><div class="v" id="eHands">0</div></div>
       <div><div class="lbl">最高の役</div><div class="v" id="eBestHand">—</div></div>
     </div>
-    <p style="font-size:12px;color:var(--muted)">得点＝撃破数×10＋生存秒数×5（クリアで＋1000）</p>
+    <p style="font-size:12px;color:var(--muted)">得点＝撃破×10＋生存秒×5＋かすり×2（クリアで＋3000）</p>
     <div class="row">
       <button class="btn" id="titleBtn" type="button">タイトル</button>
       <button class="btn primary" id="retryBtn" type="button">もう一回</button>
@@ -157,8 +225,11 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     S = Math.max(.6, Math.min(W / 420, H / 760)); VW = W / S; VH = H / S;
   }
   addEventListener('resize', resize); resize();
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-  let ac = null;
+  // ---------- sound ----------
+  let ac = null, lastSnd = {};
   function tone(f, d = .08, type = 'square', v = .03, delay = 0, f2) {
     if (!ac) return;
     const t = ac.currentTime + delay, o = ac.createOscillator(), gn = ac.createGain();
@@ -166,7 +237,7 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     gn.gain.setValueAtTime(v, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
     o.connect(gn).connect(ac.destination); o.start(t); o.stop(t + d + .02);
   }
-  let shotSoundT = 0;
+  function sfx(name, minGap, fn) { const n = performance.now(); if (n - (lastSnd[name] || 0) < minGap) return; lastSnd[name] = n; fn(); }
   const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
 
   // ---------- input (floating stick) ----------
@@ -181,26 +252,29 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   const keys = {}; addEventListener('keydown', e => keys[e.key] = true); addEventListener('keyup', e => keys[e.key] = false);
   function inputVec() {
+    if (window.__botInput) return window.__botInput(g);
     let x = 0, y = 0;
     if (joy.id !== null) { x = (joy.x - joy.ox) / R; y = (joy.y - joy.oy) / R; const d = Math.hypot(x, y); if (d < .12) x = y = 0; else if (d > 1) { x /= d; y /= d; } }
     if (keys.ArrowLeft || keys.a) x -= 1; if (keys.ArrowRight || keys.d) x += 1; if (keys.ArrowUp || keys.w) y -= 1; if (keys.ArrowDown || keys.s) y += 1;
     const d = Math.hypot(x, y); if (d > 1) { x /= d; y /= d; } return { x, y };
   }
 
-  // ---------- cards ----------
-  const SUITS = ['s', 'h', 'd', 'c'], SYM = { s: '♠', h: '♥', d: '♦', c: '♣' }, SCOL = { s: '#1d1d24', h: '#d8302f', d: '#1f6fd1', c: '#1f9a4f' };
-  const RL = r => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' })[r] || String(r);
+  // ---------- cards & hands ----------
+  const SUITS = ['s', 'h', 'd', 'c'], SYM = { s: '♠', h: '♥', d: '♦', c: '♣', w: '★' };
+  const SCOL = { s: '#1d1d24', h: '#d8302f', d: '#1f6fd1', c: '#1f9a4f', w: '#8a3fd1' };
+  const RL = r => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 0: 'W' })[r] || String(r);
+  const SUIT_BONUS = { s: '攻撃+8%', h: 'HP1回復', d: '連射+7%', c: '移動+4%・吸引UP', w: '何にでもなる' };
   const HANDS = {
     royal: { name: 'ロイヤルフラッシュ', lv: 9, desc: '全強化＋敵一掃！' },
     sf: { name: 'ストレートフラッシュ', lv: 8, desc: '全強化＋敵一掃！' },
     four: { name: 'フォーカード', lv: 7, desc: '衝撃波' },
-    fh: { name: 'フルハウス', lv: 6, desc: '最大HP+1・全回復' },
+    fh: { name: 'フルハウス', lv: 6, desc: '最大HP+2・全回復' },
     flush: { name: 'フラッシュ', lv: 5, desc: '回るカード+1' },
-    straight: { name: 'ストレート', lv: 4, desc: '速度UP・貫通+1' },
-    three: { name: 'スリーカード', lv: 3, desc: '攻撃力+30%' },
+    straight: { name: 'ストレート', lv: 4, desc: '移動・弾速UP・貫通+1' },
+    three: { name: 'スリーカード', lv: 3, desc: '攻撃力+35%' },
     two: { name: 'ツーペア', lv: 2, desc: '弾+1' },
-    pair: { name: 'ワンペア', lv: 1, desc: '連射+15%' },
-    high: { name: 'ブタ', lv: 0, desc: '攻撃力+8%' },
+    pair: { name: 'ワンペア', lv: 1, desc: '連射+20%' },
+    high: { name: 'ブタ', lv: 0, desc: '攻撃力+10%・HP1回復' },
   };
   function counts(cards) { const m = {}; for (const c of cards) m[c.r] = (m[c.r] || 0) + 1; return Object.values(m).sort((a, b) => b - a); }
   function evaluate(cards) {
@@ -209,237 +283,507 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     let straight = false;
     if (rs.length === 5) straight = rs[4] - rs[0] === 4 || rs.join() === '2,3,4,5,14';
     if (straight && flush) return rs[0] === 10 ? 'royal' : 'sf';
-    if (cn[0] === 4) return 'four'; if (cn[0] === 3 && cn[1] === 2) return 'fh';
+    if (cn[0] >= 4) return 'four'; if (cn[0] === 3 && cn[1] === 2) return 'fh';
     if (flush) return 'flush'; if (straight) return 'straight'; if (cn[0] === 3) return 'three';
     if (cn[0] === 2 && cn[1] === 2) return 'two'; if (cn[0] === 2) return 'pair'; return 'high';
   }
+  const ALL = []; for (const s of SUITS) for (let r = 2; r <= 14; r++) ALL.push({ s, r });
+  function evalBest(cards) {
+    const base = cards.filter(c => c.s !== 'w'), wild = cards.length - base.length;
+    if (!wild) return evaluate(cards);
+    let bestK = 'high';
+    const rec = (arr, w) => {
+      if (HANDS[bestK].lv === 9) return;
+      if (!w) { const k = evaluate(arr); if (HANDS[k].lv > HANDS[bestK].lv) bestK = k; return; }
+      for (const c of ALL) rec([...arr, c], w - 1);
+    };
+    rec(base, Math.min(wild, 2));
+    return bestK;
+  }
   function partialName(cards) {
     if (!cards.length) return '';
-    const cn = counts(cards);
-    let n = cn[0] === 4 ? 'フォーカード' : cn[0] === 3 && cn[1] === 2 ? 'フルハウス' : cn[0] === 3 ? 'スリーカード' : cn[0] === 2 && cn[1] === 2 ? 'ツーペア' : cn[0] === 2 ? 'ワンペア' : '';
-    const suited = cards.length >= 2 && cards.every(c => c.s === cards[0].s);
+    const base = cards.filter(c => c.s !== 'w'), wild = cards.length - base.length;
+    const cn = counts(base); cn[0] = (cn[0] || 0) + wild;
+    const n = cn[0] >= 4 ? 'フォーカード' : cn[0] === 3 && cn[1] === 2 ? 'フルハウス' : cn[0] === 3 ? 'スリーカード' : cn[0] === 2 && cn[1] === 2 ? 'ツーペア' : cn[0] === 2 ? 'ワンペア' : '';
+    const suited = cards.length >= 2 && base.every(c => c.s === (base[0] || {}).s);
     const parts = [];
-    if (n) parts.push(`今：<b>${n}</b>`);
-    if (suited) parts.push(`<b>フラッシュ</b>狙える ${SYM[cards[0].s]}`);
-    return parts.join('／') || 'まだ役なし';
+    if (n) parts.push(`<b>${n}</b>`);
+    if (suited) parts.push(`<b>フラッシュ</b>狙える${base[0] ? ' ' + SYM[base[0].s] : ''}`);
+    return parts.join('／') || '役なし';
   }
-  const randCard = () => ({ s: SUITS[Math.random() * 4 | 0], r: 2 + (Math.random() * 13 | 0) });
+  const randCard = () => ({ ...ALL[Math.random() * 52 | 0] });
 
-  // ---------- game ----------
-  const DURATION = 180;
+  // ---------- game data ----------
+  const BOSS_AT = 180;
   const ETYPES = {
-    slime: { r: 13, hp: 18, spd: 52, col: '#7ccf6a', dmg: 1, drop: .22 },
-    bat: { r: 10, hp: 9, spd: 100, col: '#a07ae0', dmg: 1, drop: .15 },
-    brute: { r: 22, hp: 110, spd: 38, col: '#c4553f', dmg: 2, drop: 1 },
-    ghost: { r: 15, hp: 40, spd: 70, col: '#e6e9f2', dmg: 1, drop: .35 },
+    slime: { r: 13, hp: 14, spd: 46, col: '#7ccf6a', dmg: 1, xp: 1 },
+    bat: { r: 10, hp: 7, spd: 92, col: '#a07ae0', dmg: 1, xp: 1 },
+    ghost: { r: 15, hp: 32, spd: 60, col: '#e6e9f2', dmg: 1, xp: 2, shoots: true },
+    brute: { r: 22, hp: 85, spd: 36, col: '#c4553f', dmg: 2, xp: 5 },
+    king: { r: 34, hp: 900, spd: 48, col: '#e0a43a', dmg: 2, xp: 30, elite: 'KING キング' },
+    queen: { r: 30, hp: 1700, spd: 42, col: '#d86aa8', dmg: 2, xp: 40, elite: 'QUEEN クイーン' },
+    joker: { r: 40, hp: 4200, spd: 34, col: '#8a3fd1', dmg: 2, xp: 0, elite: 'JOKER ジョーカー' },
   };
   let g, running = false, last = 0;
-  const rand = (a, b) => a + Math.random() * (b - a);
 
   function newGame() {
     g = {
-      t: 0, kills: 0, hands: 0, bestLv: -1, bestKey: null, over: false, won: false,
-      p: { x: 0, y: 0, hp: 5, maxHp: 5, inv: 0, face: 1, step: 0, vx: 0, vy: 0 },
-      st: { dmg: 10, rate: .55, shots: 1, pierce: 0, speed: 150, orbit: 0, nova: 0 },
+      t: 0, kills: 0, hands: 0, graze: 0, bestLv: -1, bestKey: null, over: false, won: false,
+      lvl: 1, xp: 0, need: 3, pendingLv: 0, rerolls: 2, choices: [],
+      p: { x: 0, y: 0, hp: 6, maxHp: 6, inv: 0, face: 1, step: 0, vx: 0, vy: 0 },
+      st: { dmg: 13, rate: .42, shots: 1, pierce: 0, speed: 155, orbit: 0, nova: 0, magnet: 75, bspd: 420 },
       fireT: 0, novaT: 3, orbA: 0,
-      en: [], bul: [], drops: [], hand: [], parts: [], rings: [], spawnAcc: 0, shake: 0, hitCd: new Map(),
+      en: [], bul: [], ebul: [], gems: [], items: [], parts: [], texts: [], rings: [],
+      hand: [], spawnAcc: 0, shake: 0, boss: null, events: {}, hint: 4,
     };
-    renderHand();
+    renderHand(); hud();
+  }
+  const needFor = lv => 3 + lv + Math.floor(lv * lv * .02);
+
+  function spawnEnemy(type, x, y) {
+    const T = ETYPES[type], a = Math.random() * Math.PI * 2, dist = Math.hypot(VW, VH) / 2 + 40;
+    if (x == null) { x = g.p.x + Math.cos(a) * dist; y = g.p.y + Math.sin(a) * dist; }
+    const hpMul = T.elite ? 1 : 1 + g.t / 260;
+    const e = { type, x, y, r: T.r, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (T.elite ? 1 : 1 + g.t / 500), col: T.col, dmg: T.dmg, xp: T.xp, flash: 0, wob: rand(0, 6), kx: 0, ky: 0, orbHit: 0, ai: 0, aiT: rand(1, 3), elite: !!T.elite, name: T.elite };
+    g.en.push(e);
+    return e;
+  }
+  function pickType() {
+    const t = g.t;
+    const pool = [['slime', 6], ['bat', t > 25 ? 4 : 0], ['ghost', t > 75 ? 2.5 : 0], ['brute', t > 50 ? .8 + t / 90 : 0]];
+    let tot = pool.reduce((a, b) => a + b[1], 0), r = Math.random() * tot;
+    for (const [k, w] of pool) if ((r -= w) < 0) return k;
+    return 'slime';
   }
 
-  function spawnEnemy() {
-    const t = g.t;
-    const pool = [['slime', 5], ['bat', t > 20 ? 4 : 0], ['ghost', t > 70 ? 3 : 0], ['brute', t > 45 ? 1 + t / 60 : 0]];
-    let tot = pool.reduce((a, b) => a + b[1], 0), r = Math.random() * tot, type = 'slime';
-    for (const [k, w] of pool) { if ((r -= w) < 0) { type = k; break; } }
-    const T = ETYPES[type], a = Math.random() * Math.PI * 2, dist = Math.hypot(VW, VH) / 2 + 40;
-    const hpMul = 1 + t / 90;
-    g.en.push({ type, x: g.p.x + Math.cos(a) * dist, y: g.p.y + Math.sin(a) * dist, r: T.r, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + t / 400), col: T.col, dmg: T.dmg, drop: T.drop, flash: 0, wob: rand(0, 6), kx: 0, ky: 0 });
+  function banner(main, sub, warn) {
+    const d = document.createElement('div'); d.className = 'banner' + (warn ? ' warn' : '');
+    d.innerHTML = `<b>${main}</b><span>${sub}</span>`; document.body.appendChild(d); setTimeout(() => d.remove(), 1950);
+  }
+  function floatText(x, y, txt, col = '#fff', size = 12) {
+    if (g.texts.length > 50) g.texts.shift();
+    g.texts.push({ x: x + rand(-6, 6), y, txt, col, size, life: .6 });
   }
 
   function hitEnemy(e, dmg, kx = 0, ky = 0) {
-    e.hp -= dmg; e.flash = .1; e.kx += kx; e.ky += ky;
-    if (e.hp <= 0 && !e.dead) {
-      e.dead = true; g.kills++;
-      for (let i = 0; i < 6; i++) { const a = Math.random() * 7, v = rand(40, 140); g.parts.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: .5, col: e.col }); }
-      if (Math.random() < e.drop) g.drops.push({ x: e.x, y: e.y, card: randCard(), t: 0 });
-      if (e.type === 'brute') g.drops.push({ x: e.x + 12, y: e.y, card: randCard(), t: 0 });
+    if (e.dead) return;
+    e.hp -= dmg; e.flash = .08;
+    if (!e.elite) { e.kx += kx; e.ky += ky; }
+    floatText(e.x, e.y - e.r, Math.round(dmg), e.elite ? '#ffd27a' : '#ffffff', e.elite ? 14 : 11);
+    sfx('hit', 45, () => tone(rand(180, 240), .03, 'square', .015));
+    if (e.hp <= 0) killEnemy(e);
+  }
+  function killEnemy(e) {
+    e.dead = true; g.kills++;
+    for (let i = 0; i < (e.elite ? 30 : 6); i++) { const a = Math.random() * 7, v = rand(40, e.elite ? 260 : 140); g.parts.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: e.elite ? .9 : .45, col: e.col }); }
+    if (e.xp) dropXp(e.x, e.y, e.xp);
+    if (!e.elite && Math.random() < .018) g.items.push({ kind: 'heart', x: e.x, y: e.y, t: 0 });
+    if (e.elite) {
+      g.shake = 10; buzz([40, 30, 120]);
+      if (e.type === 'joker') return winGame();
+      g.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 }, { kind: 'heart', x: e.x + 30, y: e.y, t: 0 });
+      banner('撃破！', '宝箱をひろおう');
+      if (g.boss === e) g.boss = g.en.find(o => o.elite && !o.dead && o !== e) || null;
+      [392, 523, 659, 784].forEach((f, i) => tone(f, .14, 'square', .04, i * .08));
     }
   }
+  function dropXp(x, y, v) {
+    while (v > 0) {
+      const val = v >= 10 ? 10 : v >= 5 ? 5 : 1; v -= val;
+      g.gems.push({ x: x + rand(-8, 8), y: y + rand(-8, 8), v: val, t: 0, pull: false });
+    }
+    if (g.gems.length > 350) { const old = g.gems.shift(); g.gems[g.gems.length - 1].v += old.v; }
+  }
+  function gainXp(v) {
+    g.xp += v;
+    while (g.xp >= g.need) { g.xp -= g.need; g.lvl++; g.need = needFor(g.lvl); g.pendingLv++; }
+    if (g.pendingLv > 0 && running) openLevelUp();
+  }
 
+  // ---------- level-up draft ----------
+  function makeChoices() {
+    const ch = [randCard(), randCard(), randCard()];
+    // one option leans toward what the hand is building, so a good draft is always possible
+    const base = g.hand.filter(c => c.s !== 'w');
+    if (base.length && Math.random() < .75) {
+      const sc = {}; base.forEach(c => sc[c.s] = (sc[c.s] || 0) + 1);
+      const topSuit = Object.keys(sc).sort((a, b) => sc[b] - sc[a])[0];
+      const rc = {}; base.forEach(c => rc[c.r] = (rc[c.r] || 0) + 1);
+      const topRank = +Object.keys(rc).sort((a, b) => rc[b] - rc[a])[0];
+      const help = Math.random() < .6 ? { s: topSuit, r: 2 + (Math.random() * 13 | 0) } : { s: SUITS[Math.random() * 4 | 0], r: topRank };
+      help.help = true; ch[Math.random() * 3 | 0] = help;
+    }
+    return ch;
+  }
+  function openLevelUp() {
+    running = false; joy.id = null;
+    g.choices = makeChoices();
+    renderLevelUp();
+    $('lvOv').hidden = false;
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, .1, 'triangle', .05, i * .05));
+  }
+  function cardHTML(c) { return `<span class="rk">${RL(c.r)}</span><span class="st">${SYM[c.s]}</span>`; }
+  function renderLevelUp() {
+    $('lvTitle').textContent = `LEVEL ${g.lvl - g.pendingLv + 1}!`;
+    $('lvHand').innerHTML = Array.from({ length: 5 }, (_, i) => { const c = g.hand[i]; return c ? `<div class="mini has" data-s="${c.s}">${cardHTML(c)}</div>` : '<div class="mini"></div>'; }).join('');
+    $('opts').innerHTML = g.choices.map((c, i) => {
+      const nh = [...g.hand, c];
+      let prev;
+      if (nh.length === 5) { const k = evalBest(nh); prev = `<span class="prev done">→ ${HANDS[k].name}<br>${HANDS[k].desc}</span>`; }
+      else prev = `<span class="prev">→ ${partialName(nh)}</span>`;
+      return `<button class="opt${c.help ? ' help' : ''}" type="button" id="opt${i}" data-i="${i}" aria-label="${SYM[c.s]}${RL(c.r)}を取る">
+        <div class="face" data-s="${c.s}">${cardHTML(c)}</div><span class="bonus">${SUIT_BONUS[c.s]}</span>${prev}</button>`;
+    }).join('');
+    $('rerollBtn').textContent = `引き直す（残り${g.rerolls}）`;
+    $('rerollBtn').disabled = g.rerolls <= 0;
+  }
+  $('opts').addEventListener('click', e => {
+    const b = e.target.closest('.opt'); if (!b) return;
+    const c = g.choices[+b.dataset.i];
+    g.pendingLv--;
+    $('lvOv').hidden = true;
+    addCard(c);
+    if (g.pendingLv > 0) openLevelUp();
+    else { running = true; last = performance.now(); }
+  });
+  $('rerollBtn').onclick = () => { if (g.rerolls <= 0) return; g.rerolls--; g.choices = makeChoices(); renderLevelUp(); tone(400, .08, 'triangle', .04); };
+
+  function suitBonus(c) {
+    const s = g.st, p = g.p;
+    if (c.s === 's') s.dmg *= 1.08;
+    else if (c.s === 'h') p.hp = Math.min(p.maxHp, p.hp + 1);
+    else if (c.s === 'd') s.rate *= .93;
+    else if (c.s === 'c') { s.speed *= 1.04; s.magnet *= 1.12; }
+  }
   function applyHand(key) {
     const s = g.st, p = g.p;
-    const all = () => { s.rate *= .85; s.shots++; s.dmg *= 1.3; s.speed *= 1.1; s.pierce++; s.orbit += 2; s.nova++; p.maxHp++; p.hp = p.maxHp; };
+    const all = () => { s.rate *= .82; s.shots++; s.dmg *= 1.35; s.speed *= 1.1; s.pierce++; s.orbit += 2; s.nova++; p.maxHp += 2; p.hp = p.maxHp; };
     switch (key) {
-      case 'royal': case 'sf': all(); for (const e of g.en) hitEnemy(e, 99999); g.rings.push({ x: p.x, y: p.y, r: 0, max: 600, col: '#f2b33d' }); g.shake = 14; break;
-      case 'four': s.nova++; g.novaT = .2; break;
-      case 'fh': p.maxHp++; p.hp = p.maxHp; break;
+      case 'royal': case 'sf': all(); for (const e of g.en) if (!e.elite) killEnemy(e); g.rings.push({ x: p.x, y: p.y, r: 0, max: 700, col: '#f2b33d' }); g.ebul = []; g.shake = 12; break;
+      case 'four': s.nova++; g.novaT = .3; break;
+      case 'fh': p.maxHp += 2; p.hp = p.maxHp; break;
       case 'flush': s.orbit++; break;
-      case 'straight': s.speed *= 1.12; s.pierce++; break;
-      case 'three': s.dmg *= 1.3; break;
+      case 'straight': s.speed *= 1.12; s.bspd *= 1.15; s.pierce++; break;
+      case 'three': s.dmg *= 1.35; break;
       case 'two': s.shots++; break;
-      case 'pair': s.rate *= .87; break;
-      default: s.dmg *= 1.08;
+      case 'pair': s.rate *= .83; break;
+      default: s.dmg *= 1.1; p.hp = Math.min(p.maxHp, p.hp + 1);
     }
   }
-
   function addCard(card) {
-    g.hand.push(card);
-    tone(900, .06, 'triangle', .05);
+    g.hand.push(card); suitBonus(card);
     if (g.hand.length === 5) {
-      const key = evaluate(g.hand), h = HANDS[key];
+      const key = evalBest(g.hand), h = HANDS[key];
       g.hands++; if (h.lv > g.bestLv) { g.bestLv = h.lv; g.bestKey = key; }
       applyHand(key);
       banner(h.name, h.desc);
-      if (h.lv >= 1) { [523, 659, 784, 1047].slice(0, 1 + Math.ceil(h.lv / 3)).forEach((f, i) => tone(f, .12, 'square', .04, i * .08)); buzz(h.lv >= 5 ? [30, 30, 90] : 30); }
-      else tone(220, .2, 'sawtooth', .04);
-      setTimeout(() => { g.hand = []; renderHand(); }, 450);
+      g.rings.push({ x: g.p.x, y: g.p.y, r: 0, max: 160, col: '#59d1ff' });
+      [523, 659, 784, 1047, 1319].slice(0, 2 + Math.ceil(h.lv / 3)).forEach((f, i) => tone(f, .14, 'square', .045, i * .08));
+      buzz(h.lv >= 5 ? [30, 30, 90] : 30);
+      g.hand = [];
     }
-    renderHand();
-  }
-
-  function banner(main, sub) {
-    const d = document.createElement('div'); d.className = 'banner';
-    d.innerHTML = `<b>${main}</b><span>${sub}</span>`; document.body.appendChild(d); setTimeout(() => d.remove(), 1850);
+    renderHand(); hud();
   }
 
   const slotsEl = $('slots');
-  for (let i = 0; i < 5; i++) { const b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.id = 'slot' + i; b.dataset.i = i; slotsEl.appendChild(b); }
-  slotsEl.addEventListener('click', e => {
-    const b = e.target.closest('.slot'); if (!b || !g || g.hand.length >= 5 || !running) return;
-    const i = +b.dataset.i; if (i < g.hand.length) { g.hand.splice(i, 1); renderHand(); tone(300, .06, 'triangle', .04); }
-  });
   function renderHand() {
-    [...slotsEl.children].forEach((b, i) => {
-      const c = g.hand[i];
-      b.classList.toggle('has', !!c);
-      if (c) { b.dataset.s = c.s; b.innerHTML = `<span class="rk">${RL(c.r)}</span><span class="st">${SYM[c.s]}</span>`; b.setAttribute('aria-label', `${SYM[c.s]}${RL(c.r)}を捨てる`); }
-      else { delete b.dataset.s; b.innerHTML = ''; b.setAttribute('aria-label', '空き'); }
-    });
-    $('handInfo').innerHTML = g.hand.length ? partialName(g.hand) + '　<span style="opacity:.7">（タップで捨てる）</span>' : '敵が落とすカードを5枚集めると役が発動';
+    slotsEl.innerHTML = Array.from({ length: 5 }, (_, i) => { const c = g.hand[i]; return c ? `<div class="mini has" data-s="${c.s}">${cardHTML(c)}</div>` : '<div class="mini"></div>'; }).join('');
+    $('handInfo').innerHTML = g.hand.length ? `いまの手札：${partialName(g.hand)}` : 'レベルアップでカードを選んで役を作ろう';
   }
 
+  // ---------- enemy bullets (danmaku) ----------
+  function fireRing(x, y, n, spd, off = 0, col = '#ff8fb1') {
+    for (let i = 0; i < n; i++) { const a = off + i / n * Math.PI * 2; g.ebul.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 6, col, grazed: false, life: 7 }); }
+  }
+  function fireAt(x, y, spd, spreadN = 1, spread = .25, col = '#ffe08a') {
+    const base = Math.atan2(g.p.y - y, g.p.x - x);
+    for (let i = 0; i < spreadN; i++) { const a = base + (i - (spreadN - 1) / 2) * spread; g.ebul.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 6, col, grazed: false, life: 7 }); }
+  }
+  function eliteAI(e, dt) {
+    e.aiT -= dt;
+    const p = g.p;
+    if (e.type === 'king') {
+      // telegraphed charge
+      if (e.ai === 0 && e.aiT <= 0) { e.ai = 1; e.aiT = .8; e.dashA = Math.atan2(p.y - e.y, p.x - e.x); }
+      else if (e.ai === 1 && e.aiT <= 0) { e.ai = 2; e.aiT = .55; tone(120, .3, 'sawtooth', .05, 0, 60); }
+      else if (e.ai === 2) { e.x += Math.cos(e.dashA) * 420 * dt; e.y += Math.sin(e.dashA) * 420 * dt; if (e.aiT <= 0) { e.ai = 0; e.aiT = 3.2; fireRing(e.x, e.y, 10, 110, Math.random(), '#ffd27a'); } return true; }
+      return e.ai === 1;
+    }
+    if (e.type === 'queen') {
+      if (e.aiT <= 0) {
+        e.ai = (e.ai + 1) % 3;
+        if (e.ai === 0) { fireRing(e.x, e.y, 16, 105, Math.random()); e.aiT = 2.4; }
+        else if (e.ai === 1) { fireAt(e.x, e.y, 150, 5, .22); e.aiT = 2; }
+        else { fireRing(e.x, e.y, 12, 90, 0); fireRing(e.x, e.y, 12, 125, Math.PI / 12); e.aiT = 2.8; }
+        tone(700, .08, 'triangle', .03);
+      }
+      return false;
+    }
+    if (e.type === 'joker') {
+      const phase2 = e.hp < e.maxHp * .5;
+      e.spin = (e.spin || 0) + dt * (phase2 ? 2.4 : 1.7);
+      e.spiralT = (e.spiralT || 0) - dt;
+      if (e.ai === 0) { // spiral
+        if (e.spiralT <= 0) { e.spiralT = phase2 ? .11 : .15; for (let k = 0; k < (phase2 ? 3 : 2); k++) { const a = e.spin + k * Math.PI * 2 / (phase2 ? 3 : 2); g.ebul.push({ x: e.x, y: e.y, vx: Math.cos(a) * 115, vy: Math.sin(a) * 115, r: 6, col: '#c79bff', grazed: false, life: 7 }); } }
+        if (e.aiT <= 0) { e.ai = 1; e.aiT = 1.2; }
+      } else if (e.ai === 1) { // rings
+        if (e.aiT <= 0) { fireRing(e.x, e.y, phase2 ? 22 : 18, 100, Math.random()); fireAt(e.x, e.y, 170, 3, .3); e.ai = 2; e.aiT = 2; }
+      } else { // summon
+        if (e.aiT <= 0) {
+          for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; spawnEnemy('bat', p.x + Math.cos(a) * 320, p.y + Math.sin(a) * 320); }
+          e.ai = 0; e.aiT = 4;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  function spawnElite(type) {
+    const e = spawnEnemy(type);
+    g.boss = e;
+    banner(type === 'joker' ? 'JOKER 出現！' : `${type === 'king' ? 'キング' : 'クイーン'} 出現！`, type === 'joker' ? '倒せばクリア！' : '倒すと宝箱', true);
+    tone(110, .5, 'sawtooth', .06, 0, 80); buzz([60, 40, 60]);
+  }
+  function swarm(n, type = 'bat') {
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; spawnEnemy(type, g.p.x + Math.cos(a) * 360, g.p.y + Math.sin(a) * 360); }
+    banner('囲まれた！', '包囲を突破しろ', true);
+  }
+
+  // ---------- update ----------
   function update(dt) {
-    g.t += dt;
+    g.t += dt; g.hint -= dt;
     const p = g.p, s = g.st, inp = inputVec();
     p.vx += (inp.x * s.speed - p.vx) * Math.min(1, dt * 12); p.vy += (inp.y * s.speed - p.vy) * Math.min(1, dt * 12);
     p.x += p.vx * dt; p.y += p.vy * dt; if (Math.abs(p.vx) > 5) p.face = Math.sign(p.vx);
     p.step += Math.hypot(p.vx, p.vy) * dt * .05; p.inv -= dt;
 
-    // spawning
-    const rate = 0.9 + g.t / 22 + (g.t > 150 ? 3 : 0);
-    g.spawnAcc += rate * dt;
-    while (g.spawnAcc >= 1) { g.spawnAcc--; if (g.en.length < 220) spawnEnemy(); }
+    // timeline
+    const ev = g.events;
+    if (!ev.sw1 && g.t > 40) { ev.sw1 = 1; swarm(18); }
+    if (!ev.king && g.t > 60) { ev.king = 1; spawnElite('king'); }
+    if (!ev.sw2 && g.t > 100) { ev.sw2 = 1; swarm(26); }
+    if (!ev.queen && g.t > 120) { ev.queen = 1; spawnElite('queen'); }
+    if (!ev.sw3 && g.t > 155) { ev.sw3 = 1; swarm(22, 'slime'); }
+    if (!ev.joker && g.t > BOSS_AT) { ev.joker = 1; spawnElite('joker'); }
 
-    // auto-fire at nearest enemy
+    const bossFight = ev.joker;
+    const rate = bossFight ? .8 : g.t < 30 ? .9 + g.t * .03 : 1.8 + (g.t - 30) * .022;
+    g.spawnAcc += rate * dt;
+    while (g.spawnAcc >= 1) { g.spawnAcc--; if (g.en.length < 240) spawnEnemy(pickType()); }
+
+    // auto-fire
     g.fireT -= dt;
     if (g.fireT <= 0) {
-      let tgt = null, bd = 380 * 380;
+      let tgt = null, bd = 400 * 400;
       for (const e of g.en) { const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2; if (d < bd) { bd = d; tgt = e; } }
+      // every other volley goes to a boss in range, so bosses never get ignored behind a crowd
+      g.vol = (g.vol || 0) + 1;
+      if (g.boss && !g.boss.dead && g.vol % 2 === 0 && (g.boss.x - p.x) ** 2 + (g.boss.y - p.y) ** 2 < 420 * 420) tgt = g.boss;
       if (tgt) {
         g.fireT = s.rate;
-        const base = Math.atan2(tgt.y - p.y, tgt.x - p.x), spread = .16;
+        const base = Math.atan2(tgt.y - p.y, tgt.x - p.x), spread = .15;
         for (let i = 0; i < s.shots; i++) {
           const a = base + (i - (s.shots - 1) / 2) * spread;
-          g.bul.push({ x: p.x, y: p.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, life: 1.1, pierce: s.pierce, hit: new Set(), a });
+          g.bul.push({ x: p.x, y: p.y, vx: Math.cos(a) * s.bspd, vy: Math.sin(a) * s.bspd, life: 1.1, pierce: s.pierce, hit: [], a, boss: tgt.elite });
         }
-        if (g.t - shotSoundT > .12) { shotSoundT = g.t; tone(1400, .03, 'square', .015); }
+        sfx('shot', 110, () => tone(1400, .025, 'square', .012));
       } else g.fireT = .1;
     }
     for (const b of g.bul) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.a += dt * 14;
       for (const e of g.en) {
-        if (e.dead || b.hit.has(e)) continue;
-        if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < (e.r + 6) ** 2) {
-          b.hit.add(e); hitEnemy(e, s.dmg, b.vx * .02, b.vy * .02);
+        if (e.dead || b.hit.includes(e) || (b.boss && !e.elite)) continue;
+        if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < (e.r + 7) ** 2) {
+          b.hit.push(e); hitEnemy(e, s.dmg, b.vx * .015, b.vy * .015);
           if (b.pierce-- <= 0) { b.life = 0; break; }
         }
       }
     }
     g.bul = g.bul.filter(b => b.life > 0);
 
-    // orbiting cards
-    g.orbA += dt * 3.2;
-    if (s.orbit > 0) {
-      for (let i = 0; i < s.orbit; i++) {
-        const a = g.orbA + i * Math.PI * 2 / s.orbit, ox = p.x + Math.cos(a) * 62, oy = p.y + Math.sin(a) * 62;
-        for (const e of g.en) {
-          if (e.dead) continue;
-          if ((e.x - ox) ** 2 + (e.y - oy) ** 2 < (e.r + 10) ** 2) {
-            const k = g.hitCd.get(e) || 0; if (g.t - k > .35) { g.hitCd.set(e, g.t); hitEnemy(e, s.dmg * .9, (e.x - p.x) * .05, (e.y - p.y) * .05); }
-          }
-        }
+    // orbiters
+    g.orbA += dt * 3.4;
+    for (let i = 0; i < s.orbit; i++) {
+      const a = g.orbA + i * Math.PI * 2 / s.orbit, ox = p.x + Math.cos(a) * 64, oy = p.y + Math.sin(a) * 64;
+      for (const e of g.en) {
+        if (e.dead || g.t - e.orbHit < .3) continue;
+        if ((e.x - ox) ** 2 + (e.y - oy) ** 2 < (e.r + 11) ** 2) { e.orbHit = g.t; hitEnemy(e, s.dmg * 1.1, (e.x - p.x) * .05, (e.y - p.y) * .05); }
       }
+      // orbiting cards also eat enemy bullets
+      for (const b of g.ebul) if ((b.x - ox) ** 2 + (b.y - oy) ** 2 < 14 * 14) b.life = 0;
     }
     // nova
     if (s.nova > 0) {
       g.novaT -= dt;
       if (g.novaT <= 0) {
-        g.novaT = Math.max(1.5, 3.6 - s.nova * .4);
-        const rad = 120 + s.nova * 25;
+        g.novaT = Math.max(1.4, 3.4 - s.nova * .4);
+        const rad = 130 + s.nova * 25;
         g.rings.push({ x: p.x, y: p.y, r: 0, max: rad, col: '#ffe08a' });
-        for (const e of g.en) { const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < rad + e.r) hitEnemy(e, 30 + s.dmg * 2, (e.x - p.x) / d * 8, (e.y - p.y) / d * 8); }
+        for (const e of g.en) { const d = Math.hypot(e.x - p.x, e.y - p.y) || 1; if (d < rad + e.r) hitEnemy(e, 25 + s.dmg * 2, (e.x - p.x) / d * 8, (e.y - p.y) / d * 8); }
+        for (const b of g.ebul) if (Math.hypot(b.x - p.x, b.y - p.y) < rad) b.life = 0;
         tone(180, .25, 'sine', .05, 0, 90);
       }
     }
 
     // enemies
+    const CONTACT = 9;
     for (const e of g.en) {
       if (e.dead) continue;
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
-      e.x += (dx / d * e.spd + e.kx * 60) * dt; e.y += (dy / d * e.spd + e.ky * 60) * dt;
+      let skipMove = false;
+      if (e.elite) skipMove = eliteAI(e, dt);
+      else if (e.type === 'ghost' && g.t > 90) { e.aiT -= dt; if (e.aiT <= 0 && d < 330) { e.aiT = rand(3.5, 5.5); fireAt(e.x, e.y, 120); } }
+      if (!skipMove) { e.x += (dx / d * e.spd + e.kx * 60) * dt; e.y += (dy / d * e.spd + e.ky * 60) * dt; }
       e.kx *= .85; e.ky *= .85; e.flash -= dt; e.wob += dt * 6;
-      if (d < e.r + 12 && p.inv <= 0) {
-        p.hp -= e.dmg; p.inv = 1; g.shake = 8; buzz(70); tone(140, .2, 'sawtooth', .06);
-        for (const q of g.en) { const qd = Math.hypot(q.x - p.x, q.y - p.y); if (qd < 90) { q.kx += (q.x - p.x) / qd * 6; q.ky += (q.y - p.y) / qd * 6; } }
-        if (p.hp <= 0) return end(false);
-      }
-      // despawn if hopelessly far
-      if (d > 1400) e.dead = true;
+      if (d < e.r + CONTACT) hurt(e.dmg, e);
+      if (d > 1300 && !e.elite) e.dead = true;
     }
-    // cheap separation on a sample to stop stacking
-    for (let i = 0; i < Math.min(60, g.en.length); i++) {
-      const a = g.en[Math.random() * g.en.length | 0], b = g.en[Math.random() * g.en.length | 0];
-      if (a === b) continue; const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy), m = a.r + b.r;
-      if (d < m && d > 0) { const push = (m - d) / 2; a.x += dx / d * push; a.y += dy / d * push; b.x -= dx / d * push; b.y -= dy / d * push; }
-    }
+    separate();
     g.en = g.en.filter(e => !e.dead);
 
-    // drops (magnet)
-    g.drops = g.drops.filter(dr => {
-      dr.t += dt;
-      const dx = p.x - dr.x, dy = p.y - dr.y, d = Math.hypot(dx, dy);
-      if (d < 80) { dr.x += dx / d * 320 * dt; dr.y += dy / d * 320 * dt; }
-      if (d < 18) { if (g.hand.length < 5) { addCard(dr.card); return false; } }
-      return dr.t < 25;
+    // enemy bullets: tiny hitbox + graze
+    for (const b of g.ebul) {
+      b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+      const d = Math.hypot(b.x - p.x, b.y - p.y);
+      if (d < b.r + 3) { b.life = 0; hurt(1); }
+      else if (d < 24 && !b.grazed) {
+        b.grazed = true; g.graze++; gainXp(1);
+        g.parts.push({ x: p.x + (b.x - p.x) * .5, y: p.y + (b.y - p.y) * .5, vx: 0, vy: -30, life: .3, col: '#ffffff' });
+        sfx('graze', 60, () => tone(1800, .03, 'sine', .03));
+      }
+    }
+    g.ebul = g.ebul.filter(b => b.life > 0);
+
+    // xp chips
+    const mag = s.magnet;
+    g.gems = g.gems.filter(gm => {
+      gm.t += dt;
+      const dx = p.x - gm.x, dy = p.y - gm.y, d = Math.hypot(dx, dy) || 1;
+      if (d < mag) gm.pull = true;
+      if (gm.pull) { const sp = 260 + gm.t * 80; gm.x += dx / d * sp * dt; gm.y += dy / d * sp * dt; }
+      if (d < 16) {
+        sfx('gem', 40, () => tone(880 + Math.min(900, g.xp / g.need * 900), .04, 'sine', .035));
+        gainXp(gm.v); return false;
+      }
+      return true;
+    });
+    // items
+    g.items = g.items.filter(it => {
+      it.t += dt;
+      const d = Math.hypot(p.x - it.x, p.y - it.y);
+      if (d < 22) {
+        if (it.kind === 'heart') { p.hp = Math.min(p.maxHp, p.hp + 2); floatText(p.x, p.y - 26, '+2 HP', '#ff8a96', 14); tone(660, .12, 'sine', .05); tone(990, .15, 'sine', .05, .08); }
+        else { g.rerolls++; banner('宝箱！', 'ワイルドカード＋引き直し1回'); addCard({ s: 'w', r: 0 }); [659, 784, 988, 1319].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); }
+        return false;
+      }
+      return true;
     });
 
-    for (const q of g.parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; }
+    for (const q of g.parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .96; q.vy *= .96; q.life -= dt; }
     g.parts = g.parts.filter(q => q.life > 0);
-    for (const r of g.rings) r.r += dt * 600; g.rings = g.rings.filter(r => r.r < r.max);
+    for (const t of g.texts) { t.y -= 30 * dt; t.life -= dt; }
+    g.texts = g.texts.filter(t => t.life > 0);
+    for (const r of g.rings) r.r += dt * 650; g.rings = g.rings.filter(r => r.r < r.max);
     g.shake = Math.max(0, g.shake - dt * 30);
-    if (g.t >= DURATION) end(true);
   }
 
-  function scoreOf() { return g.kills * 10 + Math.floor(g.t) * 5 + (g.won ? 1000 : 0); }
-  function end(won) {
+  function hurt(dmg, src) {
+    const p = g.p;
+    if (p.inv > 0 || g.over || g.won) return;
+    p.hp -= dmg; p.inv = 1.3; g.shake = 7; buzz(70); tone(140, .2, 'sawtooth', .06);
+    floatText(p.x, p.y - 26, `-${dmg}`, '#ff5a6a', 16);
+    // shove nearby enemies away so a hit is not followed by an instant second hit
+    for (const q of g.en) { if (q.elite) continue; const qd = Math.hypot(q.x - p.x, q.y - p.y) || 1; if (qd < 110) { q.kx += (q.x - p.x) / qd * 7; q.ky += (q.y - p.y) / qd * 7; } }
+    for (const b of g.ebul) if (Math.hypot(b.x - p.x, b.y - p.y) < 70) b.life = 0;
+    if (p.hp <= 0) endGame(false);
+  }
+
+  // grid-bucketed separation keeps crowds readable
+  function separate() {
+    const cell = 40, grid = new Map();
+    for (const e of g.en) { if (e.dead) continue; const k = (Math.floor(e.x / cell) * 73856093) ^ (Math.floor(e.y / cell) * 19349663); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(e); }
+    for (const e of g.en) {
+      if (e.dead) continue;
+      const cx = Math.floor(e.x / cell), cy = Math.floor(e.y / cell);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+        const a = grid.get(((cx + ox) * 73856093) ^ ((cy + oy) * 19349663)); if (!a) continue;
+        for (const o of a) {
+          if (o === e) continue;
+          const dx = e.x - o.x, dy = e.y - o.y, d = Math.hypot(dx, dy), m = (e.r + o.r) * .85;
+          if (d < m && d > .01) { const push = (m - d) * .25; const we = e.elite ? .1 : 1; e.x += dx / d * push * we; e.y += dy / d * push * we; }
+        }
+      }
+    }
+  }
+
+  function scoreOf() { return g.kills * 10 + Math.floor(g.t) * 5 + g.graze * 2 + (g.won ? 3000 : 0); }
+  function winGame() { g.won = true; g.ebul = []; for (const e of g.en) e.dead = true; banner('JOKER 撃破！', 'クリア！'); setTimeout(() => endGame(true), 1200); }
+  function endGame(won) {
+    if (g.over) return;
     running = false; g.over = true; g.won = won;
     const sc = scoreOf(), isBest = sc > best; if (isBest) { best = sc; store.set('cs_best', best); }
-    $('eTitle').textContent = won ? '3分間 生存成功！' : 'GAME OVER';
+    $('eTitle').textContent = won ? 'GAME CLEAR!' : 'GAME OVER';
     $('eScore').textContent = sc.toLocaleString(); $('eBest').hidden = !isBest;
     $('eTime').textContent = Math.floor(g.t / 60) + '分' + String(Math.floor(g.t % 60)).padStart(2, '0') + '秒';
-    $('eKill').textContent = g.kills; $('eHands').textContent = g.hands + '回';
+    $('eKill').textContent = g.kills; $('eLv').textContent = g.lvl; $('eGraze').textContent = g.graze;
+    $('eHands').textContent = g.hands + '回';
     $('eBestHand').textContent = g.bestKey ? HANDS[g.bestKey].name : '—';
     if (won) { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .2, 'square', .04, i * .1)); } else { tone(200, .6, 'sawtooth', .06, 0, 60); buzz([100, 50, 200]); }
-    setTimeout(() => { $('endOv').hidden = false; }, 700);
+    setTimeout(() => { $('endOv').hidden = false; }, won ? 300 : 800);
   }
 
   // ---------- drawing ----------
+  function rrect(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
   function drawCardShape(x, y, w, h, card, rot = 0) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
-    ctx.fillStyle = '#fbf7ee'; ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-w / 2, -h / 2, w, h, 3) : ctx.rect(-w / 2, -h / 2, w, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fbf7ee'; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
+    rrect(-w / 2, -h / 2, w, h, 3); ctx.fill(); ctx.stroke();
     if (card) { ctx.fillStyle = SCOL[card.s]; ctx.font = `bold ${h * .55}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(SYM[card.s], 0, 1); }
+    ctx.restore();
+  }
+  function drawChip(x, y, v) {
+    const col = v >= 10 ? '#f2b33d' : v >= 5 ? '#e0464f' : '#59d1ff', r = v >= 10 ? 7 : v >= 5 ? 6 : 4.5;
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.2; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.arc(x, y, r - 1.5, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  }
+  function drawEnemy(e, p) {
+    ctx.save(); ctx.translate(e.x, e.y);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, e.r * .9, e.r * .9, e.r * .3, 0, 0, 7); ctx.fill();
+    const col = e.flash > 0 ? '#ffffff' : e.col;
+    ctx.fillStyle = col;
+    if (e.type === 'bat') {
+      const f = Math.sin(e.wob * 2) * 6;
+      ctx.beginPath(); ctx.moveTo(-e.r * 2, -f); ctx.lineTo(0, 2); ctx.lineTo(e.r * 2, -f); ctx.lineTo(0, -4); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, e.r * .7, 0, 7); ctx.fill();
+    } else if (e.type === 'ghost') {
+      ctx.globalAlpha = .88; ctx.beginPath(); ctx.arc(0, -2, e.r, Math.PI, 0); ctx.lineTo(e.r, e.r);
+      for (let i = 0; i < 4; i++) ctx.lineTo(e.r - (i + .5) * e.r / 2, e.r - (i % 2 ? 0 : 5) + Math.sin(e.wob + i) * 2);
+      ctx.lineTo(-e.r, e.r); ctx.fill(); ctx.globalAlpha = 1;
+    } else if (e.elite) {
+      // a walking face card
+      const w = e.r * 1.4, h = e.r * 1.9, tilt = Math.sin(e.wob * .5) * .08;
+      ctx.rotate(tilt);
+      ctx.fillStyle = e.flash > 0 ? '#ffffff' : '#fbf7ee'; rrect(-w / 2, -h / 2, w, h, 6); ctx.fill();
+      ctx.strokeStyle = e.col; ctx.lineWidth = 4; ctx.stroke();
+      ctx.fillStyle = e.col; ctx.font = `bold ${e.r * .9}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(e.type === 'king' ? 'K' : e.type === 'queen' ? 'Q' : '★', 0, -e.r * .15);
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-e.r * .25, e.r * .45, 3, 0, 7); ctx.arc(e.r * .25, e.r * .45, 3, 0, 7); ctx.fill();
+      if (e.type === 'king' && e.ai === 1) { // charge telegraph
+        ctx.rotate(-tilt); ctx.strokeStyle = 'rgba(255,90,106,.55)'; ctx.lineWidth = e.r * 1.2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(e.dashA) * 240, Math.sin(e.dashA) * 240); ctx.stroke();
+      }
+    } else {
+      const sq = 1 + Math.sin(e.wob) * .08;
+      ctx.beginPath(); ctx.ellipse(0, 0, e.r * sq, e.r / sq, 0, 0, 7); ctx.fill();
+      if (e.type === 'brute') { ctx.fillStyle = '#2a1410'; ctx.fillRect(-e.r * .7, -e.r * .2, e.r * 1.4, 3); }
+    }
+    if (!e.elite) {
+      const look = Math.atan2(p.y - e.y, p.x - e.x), er = Math.max(1.8, e.r * .13);
+      ctx.fillStyle = '#111'; ctx.beginPath();
+      ctx.arc(-e.r * .3 + Math.cos(look) * 2, -e.r * .15 + Math.sin(look) * 2, er, 0, 7);
+      ctx.arc(e.r * .3 + Math.cos(look) * 2, -e.r * .15 + Math.sin(look) * 2, er, 0, 7); ctx.fill();
+      if (e.type === 'brute' && e.hp < e.maxHp) { ctx.fillStyle = '#300'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2, 4); ctx.fillStyle = '#ff5a6a'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4); }
+    }
     ctx.restore();
   }
   function draw() {
@@ -450,43 +794,24 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     const sx = g.shake ? rand(-g.shake, g.shake) : 0, sy = g.shake ? rand(-g.shake, g.shake) : 0;
     const cx = p.x - VW / 2 + sx, cy = p.y - VH / 2 + sy;
     ctx.translate(-cx, -cy);
-    // felt pattern: faint suit marks on a grid
+    // felt: faint suit marks on a grid
     const G = 80, x0 = Math.floor(cx / G) * G, y0 = Math.floor(cy / G) * G;
-    ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(255,255,255,.05)';
     for (let x = x0; x < cx + VW + G; x += G) for (let y = y0; y < cy + VH + G; y += G) {
-      const k = ((x / G) & 3) ^ ((y / G) & 3) & 3;
-      ctx.fillStyle = 'rgba(255,255,255,.035)'; ctx.fillText(SYM[SUITS[Math.abs(k) % 4]], x, y);
+      const k = Math.abs(((x / G) * 7 + (y / G) * 3) | 0) % 4;
+      ctx.fillText(SYM[SUITS[k]], x, y);
     }
-    // drops
-    for (const d of g.drops) { const bob = Math.sin(d.t * 5) * 3; drawCardShape(d.x, d.y + bob, 16, 22, d.card); }
-    // enemies
-    for (const e of g.en) {
-      ctx.save(); ctx.translate(e.x, e.y);
-      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, e.r * .9, e.r * .9, e.r * .3, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.col;
-      if (e.type === 'bat') {
-        const f = Math.sin(e.wob * 2) * 6;
-        ctx.beginPath(); ctx.moveTo(-e.r * 2, -f); ctx.lineTo(0, 2); ctx.lineTo(e.r * 2, -f); ctx.lineTo(0, -4); ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, e.r * .7, 0, 7); ctx.fill();
-      } else if (e.type === 'ghost') {
-        ctx.globalAlpha = .85; ctx.beginPath(); ctx.arc(0, -2, e.r, Math.PI, 0); ctx.lineTo(e.r, e.r);
-        for (let i = 0; i < 4; i++) ctx.lineTo(e.r - (i + .5) * e.r / 2, e.r - (i % 2 ? 0 : 5) + Math.sin(e.wob + i) * 2);
-        ctx.lineTo(-e.r, e.r); ctx.fill(); ctx.globalAlpha = 1;
-      } else {
-        const sq = 1 + Math.sin(e.wob) * .08;
-        ctx.beginPath(); ctx.ellipse(0, 0, e.r * sq, e.r / sq, 0, 0, 7); ctx.fill();
-        if (e.type === 'brute') { ctx.fillStyle = '#2a1410'; ctx.fillRect(-e.r * .7, -e.r * .2, e.r * 1.4, 3); }
+    for (const gm of g.gems) drawChip(gm.x, gm.y, gm.v);
+    for (const it of g.items) {
+      const bob = Math.sin(it.t * 4) * 3;
+      if (it.kind === 'heart') { ctx.fillStyle = '#ff5a6a'; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥', it.x, it.y + bob); }
+      else {
+        ctx.fillStyle = 'rgba(242,179,61,.25)'; ctx.beginPath(); ctx.arc(it.x, it.y, 26 + Math.sin(it.t * 5) * 4, 0, 7); ctx.fill();
+        ctx.fillStyle = '#8a5a2b'; rrect(it.x - 14, it.y - 10 + bob, 28, 20, 4); ctx.fill(); ctx.fillStyle = '#f2b33d'; ctx.fillRect(it.x - 14, it.y - 3 + bob, 28, 4); ctx.fillRect(it.x - 2, it.y - 10 + bob, 4, 20);
       }
-      const look = Math.atan2(p.y - e.y, p.x - e.x);
-      ctx.fillStyle = '#111'; ctx.beginPath();
-      ctx.arc(-e.r * .3 + Math.cos(look) * 2, -e.r * .15 + Math.sin(look) * 2, Math.max(1.8, e.r * .13), 0, 7);
-      ctx.arc(e.r * .3 + Math.cos(look) * 2, -e.r * .15 + Math.sin(look) * 2, Math.max(1.8, e.r * .13), 0, 7); ctx.fill();
-      if (e.type === 'brute' && e.hp < e.maxHp) { ctx.fillStyle = '#300'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2, 4); ctx.fillStyle = '#ff5a6a'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4); }
-      ctx.restore();
     }
-    // bullets
-    for (const b of g.bul) drawCardShape(b.x, b.y, 9, 12, null, b.a);
-    // rings
+    for (const e of g.en) drawEnemy(e, p);
+    for (const b of g.bul) { if (b.boss) { ctx.fillStyle = 'rgba(242,179,61,.5)'; ctx.beginPath(); ctx.arc(b.x, b.y, 9, 0, 7); ctx.fill(); } drawCardShape(b.x, b.y, 9, 12, null, b.a); }
     for (const r of g.rings) { ctx.strokeStyle = r.col; ctx.globalAlpha = 1 - r.r / r.max; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke(); }
     ctx.globalAlpha = 1;
     // player
@@ -494,7 +819,7 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
       const bob = Math.sin(p.step * 6) * 2;
       ctx.save(); ctx.translate(p.x, p.y + bob);
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0, 15 - bob, 11, 4, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = '#2b2b3a'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-10, -2, 20, 16, 5) : ctx.rect(-10, -2, 20, 16); ctx.fill();
+      ctx.fillStyle = '#2b2b3a'; rrect(-10, -2, 20, 16, 5); ctx.fill();
       ctx.fillStyle = '#f2b33d'; ctx.fillRect(-2, -2, 4, 10);
       ctx.fillStyle = '#ffe3c4'; ctx.beginPath(); ctx.arc(0, -10, 9, 0, 7); ctx.fill();
       ctx.fillStyle = '#c0303a'; ctx.fillRect(-11, -18, 22, 4); ctx.fillRect(-7, -26, 14, 9);
@@ -504,11 +829,35 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     // orbiters
     for (let i = 0; i < g.st.orbit; i++) {
       const a = g.orbA + i * Math.PI * 2 / g.st.orbit;
-      drawCardShape(p.x + Math.cos(a) * 62, p.y + Math.sin(a) * 62, 16, 22, { s: SUITS[i % 4] }, a + Math.PI / 2);
+      drawCardShape(p.x + Math.cos(a) * 64, p.y + Math.sin(a) * 64, 16, 22, { s: SUITS[i % 4] }, a + Math.PI / 2);
     }
+    // enemy bullets: bright core + dark rim so they read on any background
+    for (const b of g.ebul) {
+      ctx.fillStyle = 'rgba(20,0,20,.7)'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 2, 0, 7); ctx.fill();
+      ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * .45, 0, 7); ctx.fill();
+    }
+    // hitbox dot (always visible)
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#d8302f'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, 7); ctx.fill(); ctx.stroke();
     for (const q of g.parts) { ctx.globalAlpha = Math.max(0, q.life * 2); ctx.fillStyle = q.col; ctx.fillRect(q.x - 2.5, q.y - 2.5, 5, 5); }
     ctx.globalAlpha = 1;
-    // stick
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const t of g.texts) { ctx.globalAlpha = Math.min(1, t.life * 3); ctx.font = `800 ${t.size}px "M PLUS Rounded 1c", sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(t.txt, t.x, t.y); ctx.fillStyle = t.col; ctx.fillText(t.txt, t.x, t.y); }
+    ctx.globalAlpha = 1;
+    // off-screen boss arrow
+    if (g.boss && !g.boss.dead) {
+      const b = g.boss, bx = b.x - cx, by = b.y - cy;
+      if (bx < 0 || by < 0 || bx > VW || by > VH) {
+        const a = Math.atan2(by - VH / 2, bx - VW / 2), ex = clamp(bx, 24, VW - 24), ey = clamp(by, 90, VH - 110);
+        ctx.save(); ctx.translate(cx + ex, cy + ey); ctx.rotate(a); ctx.fillStyle = '#ff5a6a';
+        ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.fill(); ctx.restore();
+      }
+    }
+    if (g.hint > 0 && running) {
+      ctx.globalAlpha = Math.min(1, g.hint); ctx.font = '800 15px "M PLUS Rounded 1c", sans-serif'; ctx.fillStyle = '#fff';
+      ctx.fillText('どこでもドラッグで移動　攻撃は自動', p.x, p.y + 60); ctx.globalAlpha = 1;
+    }
     if (joy.id !== null) {
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(joy.ox, joy.oy, R, 0, 7); ctx.stroke();
@@ -516,10 +865,21 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
     }
   }
   function hud() {
-    const p = g.p, left = Math.max(0, DURATION - g.t);
-    $('hHp').textContent = '♥'.repeat(Math.max(0, p.hp)) + '♡'.repeat(Math.max(0, p.maxHp - Math.max(0, p.hp)));
-    $('hTime').textContent = Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0');
+    const p = g.p;
+    const hp = Math.max(0, p.hp);
+    $('hHp').textContent = '♥'.repeat(hp) + '♡'.repeat(Math.max(0, p.maxHp - hp));
+    $('hLv').textContent = 'Lv' + g.lvl;
+    $('xpFill').style.transform = `scaleX(${clamp(g.xp / g.need, 0, 1)})`;
+    if (g.events.joker) { $('hTimeLbl').textContent = 'BOSS'; $('hTime').textContent = '★'; }
+    else {
+      const left = Math.max(0, BOSS_AT - g.t);
+      $('hTimeLbl').textContent = 'ジョーカーまで';
+      $('hTime').textContent = Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0');
+    }
     $('hKill').textContent = g.kills;
+    const b = g.boss;
+    $('bossBar').hidden = !(b && !b.dead);
+    if (b && !b.dead) { $('bossName').textContent = b.name; $('bossFill').style.transform = `scaleX(${clamp(b.hp / b.maxHp, 0, 1)})`; }
   }
   function frame(ts) {
     const dt = Math.min(.05, (ts - last) / 1000); last = ts;
@@ -530,25 +890,28 @@ table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--g
   function start() {
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
     if (ac && ac.state === 'suspended') ac.resume();
-    newGame(); ['startOv', 'endOv', 'pauseOv'].forEach(id => $(id).hidden = true);
-    running = true; last = performance.now(); hud();
+    newGame(); ['startOv', 'endOv', 'pauseOv', 'lvOv'].forEach(id => $(id).hidden = true);
+    running = true; last = performance.now();
   }
   function pause() {
     if (!running) return; running = false;
     const s = g.st;
-    $('buildList').innerHTML = `攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / s.rate).toFixed(1)}発/秒　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}`;
+    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / s.rate).toFixed(1)}発/秒　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>手札：${g.hand.map(c => SYM[c.s] + RL(c.r)).join(' ') || 'なし'}　引き直し ${g.rerolls}回`;
     $('pauseOv').hidden = false;
   }
   $('startBtn').onclick = start; $('retryBtn').onclick = start; $('pauseBtn').onclick = pause;
-  $('resumeBtn').onclick = () => { $('pauseOv').hidden = true; running = true; last = performance.now(); };
+  $('resumeBtn').onclick = () => { $('pauseOv').hidden = true; if (g.pendingLv > 0) openLevelUp(); else { running = true; last = performance.now(); } };
   $('quitBtn').onclick = () => { $('pauseOv').hidden = true; $('startOv').hidden = false; };
   $('titleBtn').onclick = () => { $('endOv').hidden = true; $('startOv').hidden = false; };
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
+  // test hook for automated checks
+  window.__cs = { get g() { return g; }, start, step(dt) { if (!$('lvOv').hidden) { const o = document.querySelector('.opt.help') || $('opt' + (Math.random() * 3 | 0)); o.click(); } else if (running) update(dt); } };
+
   newGame();
-  // title backdrop: a few enemies and cards around the hero
-  for (let i = 0; i < 8; i++) { g.t = 50; spawnEnemy(); const e = g.en[i]; const a = i / 8 * 7; e.x = Math.cos(a) * 150; e.y = Math.sin(a) * 200; }
-  g.t = 0; g.drops.push({ x: 40, y: 60, card: { s: 'h', r: 14 }, t: 0 }, { x: -60, y: -40, card: { s: 's', r: 13 }, t: 1 });
+  // title backdrop
+  g.t = 60; for (let i = 0; i < 8; i++) { const e = spawnEnemy(pickType()); const a = i / 8 * 7; e.x = Math.cos(a) * 150; e.y = Math.sin(a) * 200; }
+  g.t = 0; dropXp(40, 60, 12); g.items.push({ kind: 'chest', x: -70, y: -50, t: 0 });
   hud(); last = performance.now(); requestAnimationFrame(frame);
 })();
 </script>
