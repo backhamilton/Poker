@@ -411,13 +411,15 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     const c = { n, name: `STAGE ${n}`, sub: th.sub, bg: th.bg };
     if (n === 1) {
       // tutorial: fewer, softer enemies; the brute shows up late
-      Object.assign(c, { hp0: .85, spawn: .8, eliteMul: .7, dmgMul: .8, xpMul: 1, gemLife: Infinity, bomberR: 70,
+      Object.assign(c, { hp0: .85, spawn: .8, eliteMul: .7, dmgMul: .8, xpMul: 1, gemLife: Infinity, bomberR: 70, tempo: 1, dens: 1, bsp: 1, mspd: 1,
         pool: t => [['slime', 6], ['bat', t > 30 ? 3 : 0], ['brute', t > 70 ? .6 : 0]],
         events: [{ t: 40, swarm: 'bat', n: 12 }, { t: 75, boss: 'jack' }, { t: 115, swarm: 'slime', n: 16 }, { t: BOSS_AT, boss: 'king', final: true }] });
       return c;
     }
     Object.assign(c, {
-      hp0: Math.pow(1.6, n - 1) * .85, spawn: Math.min(2, 1 + (n - 1) * .1), eliteMul: Math.pow(1.6, n - 1) * .75, dmgMul: Math.pow(1.15, n - 1),
+      hp0: Math.pow(1.9, n - 1) * .85, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(2.1, n - 1) * .75, dmgMul: Math.pow(1.22, n - 1),
+      // bosses act faster, fire denser and quicker patterns as stages go on
+      tempo: Math.min(1.6, 1 + (n - 1) * .08), dens: Math.min(2, 1 + (n - 1) * .12), bsp: Math.min(1.4, 1 + (n - 1) * .05), mspd: Math.min(1.5, 1 + (n - 1) * .04),
       xpMul: 1 + (n - 1) * .15, gemLife: Math.max(20, 40 - (n - 2) * 5), bomberR: Math.min(115, 70 + Math.max(0, n - 3) * 7),
     });
     c.pool = t => {
@@ -477,7 +479,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     const T = ETYPES[type], a = Math.random() * Math.PI * 2, dist = Math.hypot(VW, VH) / 2 + 40;
     if (x == null) { x = g.p.x + Math.cos(a) * dist; y = g.p.y + Math.sin(a) * dist; }
     const hpMul = T.elite ? stage.eliteMul : stage.hp0 * (1 + g.t / 260);
-    const e = { type, ai: T.ai, x, y, r: T.r, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (T.elite ? 1 : 1 + g.t / 500), col: T.col,
+    const e = { type, ai: T.ai, x, y, r: T.r, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (T.elite ? 1 : (1 + g.t / 500) * stage.mspd), col: T.col, age: 0, enraged: false,
       dmg: Math.round(T.dmg * stage.dmgMul), xp: T.xp,
       flash: 0, wob: rand(0, 6), kx: 0, ky: 0, orbHit: 0, st: 0, stT: rand(1, 3), cd: rand(0, 2), side: Math.random() < .5 ? 1 : -1,
       elite: !!T.elite, name: T.elite, glyph: T.glyph, ang: 0, dashLen: 0, dashSpd: 0, buff: false };
@@ -653,8 +655,8 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   }
 
   // ---------- hazards ----------
-  function eb(x, y, a, spd, col = '#ff8fb1', r = 6) { g.ebul.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r, col, grazed: false, life: 7 }); }
-  function fireRing(x, y, n, spd, off = 0, col) { for (let i = 0; i < n; i++) eb(x, y, off + i / n * Math.PI * 2, spd, col); }
+  function eb(x, y, a, spd, col = '#ff8fb1', r = 6) { spd *= stage.bsp; g.ebul.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r, col, grazed: false, life: 7 }); }
+  function fireRing(x, y, n, spd, off = 0, col) { n = Math.round(n * stage.dens); for (let i = 0; i < n; i++) eb(x, y, off + i / n * Math.PI * 2, spd, col); }
   function fireAt(x, y, spd, n = 1, spread = .25, col = '#ffe08a') {
     const base = Math.atan2(g.p.y - y, g.p.x - x);
     for (let i = 0; i < n; i++) eb(x, y, base + (i - (n - 1) / 2) * spread, spd, col);
@@ -790,7 +792,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 
     const rate = (g.finalUp ? .8 : g.t < 30 ? .9 + g.t * .03 : 1.8 + (g.t - 30) * .022) * stage.spawn;
     g.spawnAcc += rate * dt;
-    while (g.spawnAcc >= 1) { g.spawnAcc--; if (g.en.length < 240) spawnEnemy(pickType()); }
+    while (g.spawnAcc >= 1) { g.spawnAcc--; if (g.en.length < 280) spawnEnemy(pickType()); }
 
     // auto-fire at nearest
     g.fireT -= dt;
@@ -850,7 +852,15 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     for (const e of g.en) {
       if (e.dead) continue;
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
-      let [vx, vy] = think(e, dt, dx, dy, d);
+      // elites run on a faster clock (and move faster to match, so dash lanes stay exact); enrage after 45s
+      let k = 1;
+      if (e.elite) {
+        e.age += dt;
+        if (!e.enraged && e.age > 45) { e.enraged = true; banner(`${e.name.split(' ')[1]} 激昂！`, '攻撃が速くなった', true); tone(90, .5, 'sawtooth', .06, 0, 50); }
+        k = stage.tempo * (e.enraged ? 1.35 : 1);
+      }
+      let [vx, vy] = think(e, dt * k, dx, dy, d);
+      vx *= k; vy *= k;
       if (e.dead) continue;
       if (e.buff && e.st !== 2) { vx *= 1.4; vy *= 1.4; }
       e.x += (vx + e.kx * 60) * dt; e.y += (vy + e.ky * 60) * dt;
@@ -975,7 +985,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     $('cScore').textContent = g.score.toLocaleString(); $('cLv').textContent = g.lvl;
     $('cHp').textContent = `${Math.ceil(g.p.hp)} / ${g.p.maxHp}`; $('cHands').textContent = g.hands + '回';
     const nx = stageCfg(n + 1);
-    $('cNext').textContent = `次は STAGE ${n + 1}「${nx.sub}」。敵のHP ×${nx.hp0.toFixed(1)}、ボスは${ETYPES[nx.events[nx.events.length - 1].boss].elite.split(' ')[1]}。`;
+    $('cNext').textContent = `次は STAGE ${n + 1}「${nx.sub}」。敵のHP ×${nx.hp0.toFixed(1)}・攻撃 ×${nx.dmgMul.toFixed(1)}・ボスHP ×${(nx.eliteMul / .7).toFixed(1)}、ボスは${ETYPES[nx.events[nx.events.length - 1].boss].elite.split(' ')[1]}。`;
     [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .2, 'square', .04, i * .1));
     $('clearOv').hidden = false;
   }
@@ -1074,6 +1084,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     } else if (e.elite) {
       const w = e.r * 1.4, h = e.r * 1.9, tilt = Math.sin(e.wob * .5) * .08;
       ctx.rotate(tilt);
+      if (e.enraged) { ctx.fillStyle = `rgba(255,60,60,${.35 + .2 * Math.sin(e.wob * 3)})`; rrect(-w / 2 - 6, -h / 2 - 6, w + 12, h + 12, 10); ctx.fill(); }
       ctx.fillStyle = e.flash > 0 ? '#ffffff' : '#fbf7ee'; rrect(-w / 2, -h / 2, w, h, 6); ctx.fill();
       ctx.strokeStyle = e.col; ctx.lineWidth = 4; ctx.stroke();
       ctx.fillStyle = e.col; ctx.font = `bold ${e.r * .9}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
