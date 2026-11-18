@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
 <style>
-/* Layout: full-bleed canvas arena with a follow camera; HUD (HP bar, XP bar, timer) on top, 5-slot hand docked at the bottom, level-up card draft and stage select as modals. Single dark look by choice. */
+/* Layout: full-bleed canvas arena with a follow camera; HUD (HP bar, XP bar, timer) on top, 5-slot hand docked at the bottom; level-up draft, stage clear, records as modals. Single dark look by choice. */
 :root {
   --felt: #0f3a2e;
   --felt-dark: #0a2720;
@@ -78,7 +78,7 @@ body { background: var(--felt-dark); color: var(--ink); font-family: var(--font-
 
 .overlay {
   position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
-  background: rgba(5, 20, 16, .88); backdrop-filter: blur(3px);
+  background: rgba(5, 20, 16, .9); backdrop-filter: blur(3px);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
@@ -91,55 +91,56 @@ h2 { font-size: 30px; }
 .panel p { margin: 0; font-size: 14px; line-height: 1.7; }
 .steps { display: grid; gap: 6px; text-align: left; font-size: 13px; line-height: 1.55; background: rgba(255,255,255,.06); border-radius: 12px; padding: 12px 14px; }
 .steps b { color: var(--gold); }
-.stages { display: grid; gap: 8px; }
-.stagebtn {
-  appearance: none; cursor: pointer; text-align: left; font: inherit; color: var(--ink);
-  border: 2px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px 14px;
-  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
-}
-.stagebtn .sn { font-family: var(--font-display); font-size: 16px; color: var(--gold); }
-.stagebtn .sd { font-size: 12px; color: var(--muted); grid-column: 1; }
-.stagebtn .sb { grid-row: 1 / span 2; grid-column: 2; font-size: 12px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
-.stagebtn:disabled { opacity: .45; cursor: default; }
-.stagebtn:not(:disabled):active { transform: translateY(1px); }
+.recline { font-size: 13px; font-weight: 800; color: var(--muted); }
+.recline b { color: var(--gold); font-family: var(--font-display); font-weight: 400; font-size: 15px; }
 table.pay { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; }
 table.pay td { padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
 table.pay td:first-child { white-space: nowrap; font-weight: 800; color: var(--gold); }
-table.pay td.cnt { text-align: right; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.pay td.cnt { text-align: right; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 800; }
+table.pay td.cnt.zero { color: rgba(255,255,255,.3); }
 table.pay tr.now td { background: rgba(242,179,61,.14); }
 .btn { appearance: none; border: 2px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: var(--ink); border-radius: 12px; font: 800 15px var(--font-body); padding: 12px; cursor: pointer; }
 .btn.primary { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-size: 17px; padding: 14px; }
+.btn small { display: block; font-size: 12px; font-weight: 500; opacity: .8; }
 .btn:disabled { opacity: .4; cursor: default; }
-.btn:focus-visible, .pausebtn:focus-visible, .opt:focus-visible, .stagebtn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.btn:focus-visible, .pausebtn:focus-visible, .opt:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .big { font-family: var(--font-display); font-size: 52px; color: var(--gold); line-height: 1; font-variant-numeric: tabular-nums; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .stats > div { background: rgba(255,255,255,.06); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
 .stats .v { font-weight: 800; font-size: 15px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.buildlist { font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+.buildlist { font-size: 12.5px; color: var(--muted); line-height: 1.7; text-align: left; }
 .pausehand { display: flex; justify-content: center; gap: 6px; }
 .sectionlbl { font-size: 12px; font-weight: 800; color: var(--muted); text-align: left; }
 
 /* level-up draft */
-#lvOv { background: rgba(5, 20, 16, .78); }
-.lvtitle { font-family: var(--font-display); color: var(--xp); font-size: 30px; }
+#lvOv { background: rgba(5, 20, 16, .8); }
+.lvtitle { font-family: var(--font-display); color: var(--xp); font-size: 28px; }
+.tip { font-size: 12.5px; line-height: 1.6; text-align: left; background: rgba(89,209,255,.12); border-radius: 10px; padding: 8px 12px; }
+.tip b { color: var(--xp); }
 .opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .opt {
   appearance: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0;
-  display: flex; flex-direction: column; gap: 6px; align-items: stretch; background: none;
+  display: flex; flex-direction: column; gap: 5px; align-items: stretch; background: none;
   animation: optin .25s ease-out backwards;
 }
 .opt:nth-child(2) { animation-delay: .05s; } .opt:nth-child(3) { animation-delay: .1s; }
 @keyframes optin { from { transform: translateY(16px) rotate(-4deg); opacity: 0; } }
 .opt .face {
-  aspect-ratio: 5 / 7; max-width: 100%; background: var(--card); border-radius: 10px; position: relative;
+  aspect-ratio: 5 / 6.4; max-width: 100%; background: var(--card); border-radius: 10px; position: relative;
   box-shadow: 0 4px 0 #d9cfbb, 0 10px 18px rgba(0,0,0,.4); container-type: inline-size;
 }
 .opt .face .rk { position: absolute; left: 8%; top: 5%; font-family: var(--font-display); font-size: 30cqw; line-height: 1; }
-.opt .face .st { position: absolute; right: 8%; bottom: 4%; font-size: 48cqw; line-height: 1; }
-.opt .bonus { font-size: 11.5px; color: var(--muted); font-weight: 800; }
-.opt .prev { font-size: 12px; font-weight: 800; min-height: 2.6em; line-height: 1.3; }
-.opt .prev.done { color: var(--gold); }
+.opt .face .st { position: absolute; right: 8%; bottom: 4%; font-size: 46cqw; line-height: 1; }
+.opt .bonus { font-size: 12px; color: var(--ink); font-weight: 800; background: rgba(255,255,255,.08); border-radius: 6px; padding: 3px 2px; }
+.opt .prev { font-size: 12px; font-weight: 800; line-height: 1.3; color: var(--gold); }
+.opt .prev small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+.opt .prev.done { background: rgba(242,179,61,.16); border-radius: 6px; padding: 3px 2px; }
+.handgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; text-align: left; font-size: 11.5px; line-height: 1.35; }
+.handgrid div { display: flex; flex-direction: column; padding: 3px 6px; border-radius: 6px; }
+.handgrid b { color: var(--gold); font-size: 12px; }
+.handgrid span { color: var(--muted); }
+.handgrid .hit { background: rgba(242,179,61,.18); }
 .lvhand { display: flex; justify-content: center; gap: 6px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 </style>
@@ -153,7 +154,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       <div class="hptrack"><div class="lag" id="hpLag"></div><div class="fill" id="hpFill"></div></div>
       <div class="hpnum" id="hpNum">100 / 100</div>
     </div>
-    <div class="mid"><div class="lbl" id="hTimeLbl">ボスまで</div><div class="val" id="hTime">3:00</div></div>
+    <div class="mid"><div class="lbl" id="hTimeLbl">ボスまで</div><div class="val" id="hTime">2:30</div></div>
     <div class="right"><div class="lbl" id="hStage">STAGE 1</div><div class="val" id="hKill">0</div><button class="pausebtn" id="pauseBtn" type="button">II</button></div>
   </div>
   <div class="bossbar" id="bossBar" hidden><div class="nm" id="bossName">KING</div><div class="track"><div class="fill" id="bossFill"></div></div></div>
@@ -168,20 +169,25 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     <h1>CARD SURVIVOR<small>トランプ・サバイバー</small></h1>
     <div class="steps">
       <div><b>ドラッグで移動</b>。攻撃は自動。</div>
-      <div>敵が落とす<b>チップ</b>でレベルアップ。毎回<b>3枚から1枚</b>選んで手札へ。5枚そろうと<b>役に応じて強化</b>。</div>
-      <div>3分でステージボス登場。倒せばクリアで次のステージが開く。</div>
-      <div>金の矢印の先に<b>オールインチップ</b>。拾うと落ちているチップを全部回収。</div>
+      <div>敵が落とす<b>チップ</b>でレベルアップ。<b>3枚から1枚</b>選んで手札へ。5枚そろうと<b>役に応じて強化</b>。</div>
+      <div>カードは<b>数字が大きいほど効果も大きい</b>（Aが最大）。</div>
+      <div>2分30秒でステージボス。倒すと強さを<b>引き継いで次のステージ</b>へ。ステージは無限。どこまで行けるか挑戦。</div>
     </div>
-    <div class="stages" id="stageList"></div>
+    <div class="recline" id="titleRec"></div>
+    <button class="btn primary" id="contBtn" type="button" hidden>つづきから</button>
+    <button class="btn primary" id="newBtn" type="button">はじめから</button>
+    <button class="btn" id="recBtn" type="button">これまでの記録</button>
   </div>
 </div>
 
 <div class="overlay" id="lvOv" hidden>
   <div class="panel">
     <div class="lvtitle" id="lvTitle">LEVEL UP!</div>
+    <div class="tip" id="lvTip" hidden></div>
     <div class="lvhand" id="lvHand"></div>
     <div class="opts" id="opts"></div>
     <button class="btn" id="rerollBtn" type="button">引き直す（残り2）</button>
+    <div class="handgrid" id="lvGrid"></div>
   </div>
 </div>
 
@@ -191,34 +197,66 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     <div class="sectionlbl">いまの手札</div>
     <div class="pausehand" id="pauseHand"></div>
     <div class="handinfo" id="pauseHandInfo"></div>
-    <div class="sectionlbl">役と効果（右は発動した回数）</div>
+    <div class="sectionlbl">役と効果（右は今回の発動回数）</div>
     <table class="pay" id="payTable"></table>
-    <div class="sectionlbl">スートの効果（カードを取るたび）</div>
-    <div class="buildlist" style="text-align:left">♠ 攻撃+8%　♥ HP+8回復　♦ 連射+7%　♣ 移動+4%・吸い寄せ範囲UP　★ 何のカードにもなる</div>
+    <div class="sectionlbl">スートの効果（カードを取るたび・数字が大きいほど強い）</div>
+    <div class="buildlist">♠ 攻撃UP　♥ 最大HP UP＋回復　♦ 連射UP　♣ 移動・吸い寄せ範囲UP　★ 何のカードにもなる</div>
     <div class="sectionlbl">いまの能力</div>
-    <div class="buildlist" id="buildList" style="text-align:left"></div>
+    <div class="buildlist" id="buildList"></div>
     <button class="btn primary" id="resumeBtn" type="button">再開</button>
-    <button class="btn" id="quitBtn" type="button">ステージ選択へ</button>
+    <button class="btn" id="quitBtn" type="button">あきらめる（記録して終了）</button>
   </div>
 </div>
+
+<div class="overlay" id="clearOv" hidden>
+  <div class="panel">
+    <h2 id="cTitle">STAGE 1 CLEAR!</h2>
+    <p id="cSub">強さを引き継いで次のステージへ。HPが30%回復、引き直し＋1。</p>
+    <div class="stats">
+      <div><div class="lbl">ここまでの得点</div><div class="v" id="cScore">0</div></div>
+      <div><div class="lbl">レベル</div><div class="v" id="cLv">1</div></div>
+      <div><div class="lbl">HP</div><div class="v" id="cHp">0</div></div>
+      <div><div class="lbl">発動した役</div><div class="v" id="cHands">0</div></div>
+    </div>
+    <p id="cNext" style="font-size:13px;color:var(--muted)"></p>
+    <button class="btn primary" id="nextBtn" type="button">次のステージへ</button>
+    <button class="btn" id="stopBtn" type="button">ここでやめる<small>進み具合は保存済み。あとで「つづきから」で再開できます</small></button>
+  </div>
+</div>
+
 <div class="overlay" id="endOv" hidden>
   <div class="panel">
     <h2 id="eTitle">GAME OVER</h2>
+    <div class="recline" id="eStage"></div>
     <div class="big" id="eScore">0</div>
     <div style="color:var(--gold);font-weight:800" id="eBest" hidden>自己ベスト更新！</div>
     <div class="stats">
-      <div><div class="lbl">生存時間</div><div class="v" id="eTime">0</div></div>
+      <div><div class="lbl">プレイ時間</div><div class="v" id="eTime">0</div></div>
       <div><div class="lbl">撃破数</div><div class="v" id="eKill">0</div></div>
       <div><div class="lbl">レベル</div><div class="v" id="eLv">1</div></div>
       <div><div class="lbl">かすり</div><div class="v" id="eGraze">0</div></div>
-      <div><div class="lbl">発動した役</div><div class="v" id="eHands">0</div></div>
-      <div><div class="lbl">最高の役</div><div class="v" id="eBestHand">—</div></div>
     </div>
-    <p style="font-size:12px;color:var(--muted)">得点＝撃破×10＋生存秒×5＋かすり×2（クリアで＋3000×ステージ）</p>
+    <div class="sectionlbl">今回作った役</div>
+    <table class="pay" id="eTable"></table>
     <div class="row">
-      <button class="btn" id="titleBtn" type="button">ステージ選択</button>
+      <button class="btn" id="titleBtn" type="button">タイトル</button>
       <button class="btn primary" id="retryBtn" type="button">もう一回</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="recOv" hidden>
+  <div class="panel">
+    <h2>これまでの記録</h2>
+    <div class="stats">
+      <div><div class="lbl">最高到達ステージ</div><div class="v" id="rStage">—</div></div>
+      <div><div class="lbl">最高得点</div><div class="v" id="rScore">—</div></div>
+      <div><div class="lbl">プレイ回数</div><div class="v" id="rRuns">0</div></div>
+      <div><div class="lbl">作った役の合計</div><div class="v" id="rHands">0</div></div>
+    </div>
+    <div class="sectionlbl">役ごとの通算回数</div>
+    <table class="pay" id="rTable"></table>
+    <button class="btn primary" id="recBack" type="button">もどる</button>
   </div>
 </div>
 
@@ -229,6 +267,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
   };
   let W, H, S, VW, VH, DPR;
   function resize() {
@@ -275,7 +314,6 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   const SUITS = ['s', 'h', 'd', 'c'], SYM = { s: '♠', h: '♥', d: '♦', c: '♣', w: '★' };
   const SCOL = { s: '#1d1d24', h: '#d8302f', d: '#1f6fd1', c: '#1f9a4f', w: '#8a3fd1' };
   const RL = r => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 0: 'W' })[r] || String(r);
-  const SUIT_BONUS = { s: '攻撃+8%', h: 'HP+8回復', d: '連射+7%', c: '移動+4%・吸引UP', w: '何にでもなる' };
   const HANDS = {
     royal: { name: 'ロイヤルフラッシュ', lv: 9, desc: '全強化＋敵一掃！' },
     sf: { name: 'ストレートフラッシュ', lv: 8, desc: '全強化＋敵一掃！' },
@@ -313,78 +351,136 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     rec(base, Math.min(wild, 2));
     return bestK;
   }
-  function partialName(cards) {
-    if (!cards.length) return '';
+  // hand made so far by rank matches only (wild cards join the biggest group)
+  function partialKey(cards) {
     const base = cards.filter(c => c.s !== 'w'), wild = cards.length - base.length;
     const cn = counts(base); cn[0] = (cn[0] || 0) + wild;
-    const n = cn[0] >= 4 ? 'フォーカード' : cn[0] === 3 && cn[1] === 2 ? 'フルハウス' : cn[0] === 3 ? 'スリーカード' : cn[0] === 2 && cn[1] === 2 ? 'ツーペア' : cn[0] === 2 ? 'ワンペア' : '';
-    const suited = cards.length >= 2 && base.every(c => c.s === (base[0] || {}).s);
-    const parts = [];
-    if (n) parts.push(`<b>${n}</b>`);
-    if (suited) parts.push(`<b>フラッシュ</b>狙える${base[0] ? ' ' + SYM[base[0].s] : ''}`);
+    return cn[0] >= 4 ? 'four' : cn[0] === 3 && cn[1] === 2 ? 'fh' : cn[0] === 3 ? 'three' : cn[0] === 2 && cn[1] === 2 ? 'two' : cn[0] === 2 ? 'pair' : null;
+  }
+  function flushDraw(cards) {
+    const base = cards.filter(c => c.s !== 'w');
+    return cards.length >= 2 && base.length > 0 && base.every(c => c.s === base[0].s) ? base[0].s : null;
+  }
+  function partialName(cards) {
+    if (!cards.length) return '';
+    const k = partialKey(cards), fs = flushDraw(cards), parts = [];
+    if (k) parts.push(`<b>${HANDS[k].name}</b>`);
+    if (fs) parts.push(`<b>フラッシュ</b>狙える ${SYM[fs]}`);
     return parts.join('／') || '役なし';
   }
   const randCard = () => ({ ...ALL[Math.random() * 52 | 0] });
+
+  // card number scales the suit bonus: 2 is the weakest, A the strongest
+  const power = c => c.s === 'w' ? 0 : (c.r - 1) / 13;
+  function suitNums(c) {
+    const k = power(c);
+    return { atk: Math.round(3 + 9 * k), mhp: Math.round(1 + 5 * k), heal: Math.round(4 + 12 * k), rate: Math.round(3 + 7 * k), spd: Math.round(2 + 4 * k), mag: Math.round(5 + 15 * k) };
+  }
+  function bonusText(c) {
+    const n = suitNums(c);
+    return { s: `攻撃+${n.atk}%`, h: `最大HP+${n.mhp}・回復${n.heal}`, d: `連射+${n.rate}%`, c: `移動+${n.spd}%・吸引+${n.mag}%`, w: '何にでもなる' }[c.s];
+  }
 
   // ---------- enemies ----------
   const ETYPES = {
     slime:  { r: 13, hp: 14, spd: 46, col: '#7ccf6a', dmg: 12, xp: 1, ai: 'chase' },
     bat:    { r: 10, hp: 7,  spd: 92, col: '#a07ae0', dmg: 10, xp: 1, ai: 'weave' },
-    brute:  { r: 22, hp: 85, spd: 36, col: '#c4553f', dmg: 20, xp: 5, ai: 'chase' },
+    brute:  { r: 22, hp: 85, spd: 36, col: '#c4553f', dmg: 18, xp: 8, ai: 'brute' },
     archer: { r: 12, hp: 20, spd: 70, col: '#3b3f57', dmg: 10, xp: 2, ai: 'archer' },
-    boar:   { r: 15, hp: 34, spd: 50, col: '#e08a3a', dmg: 14, xp: 3, ai: 'tackle' },
+    boar:   { r: 15, hp: 34, spd: 50, col: '#e08a3a', dmg: 12, xp: 3, ai: 'tackle' },
     bomber: { r: 11, hp: 12, spd: 88, col: '#e2483f', dmg: 0,  xp: 2, ai: 'bomber' },
     ghost:  { r: 15, hp: 30, spd: 58, col: '#e6e9f2', dmg: 12, xp: 2, ai: 'ghost' },
     jack:   { r: 30, hp: 900,  spd: 55, col: '#3aa7a0', dmg: 15, xp: 30, ai: 'jack',  elite: 'JACK ジャック', glyph: 'J' },
-    king:   { r: 34, hp: 2400, spd: 48, col: '#e0a43a', dmg: 22, xp: 0,  ai: 'king',  elite: 'KING キング', glyph: 'K' },
-    queen:  { r: 30, hp: 1500, spd: 42, col: '#d86aa8', dmg: 20, xp: 40, ai: 'queen', elite: 'QUEEN クイーン', glyph: 'Q' },
-    witch:  { r: 32, hp: 2300, spd: 36, col: '#5fbf3a', dmg: 20, xp: 0,  ai: 'witch', elite: 'WITCH 沼の魔女', glyph: '♣' },
-    joker:  { r: 40, hp: 3400, spd: 34, col: '#8a3fd1', dmg: 22, xp: 0,  ai: 'joker', elite: 'JOKER ジョーカー', glyph: '★' },
+    king:   { r: 34, hp: 2400, spd: 48, col: '#e0a43a', dmg: 20, xp: 40, ai: 'king',  elite: 'KING キング', glyph: 'K' },
+    queen:  { r: 30, hp: 1500, spd: 42, col: '#d86aa8', dmg: 18, xp: 40, ai: 'queen', elite: 'QUEEN クイーン', glyph: 'Q' },
+    witch:  { r: 32, hp: 2300, spd: 36, col: '#5fbf3a', dmg: 18, xp: 40, ai: 'witch', elite: 'WITCH 沼の魔女', glyph: '♣' },
+    joker:  { r: 40, hp: 3400, spd: 34, col: '#8a3fd1', dmg: 20, xp: 50, ai: 'joker', elite: 'JOKER ジョーカー', glyph: '★' },
   };
+  const BRUTE_AURA = 130;
+  const CONTACT = 13;
 
-  // ---------- stages ----------
-  const STAGES = [
-    { name: 'STAGE 1', sub: '緑のフェルト', desc: 'スライムとコウモリ。中ボスはジャック、ボスはキング。',
-      pool: t => [['slime', 6], ['bat', t > 25 ? 4 : 0], ['brute', t > 50 ? .8 + t / 90 : 0]],
-      hp0: 1, hpRate: 1 / 260, spawn: 1, eliteMul: 1, gemLife: Infinity,
-      need: lv => 4 + Math.floor(lv * 1.3 + lv * lv * .03),
-      events: [{ t: 40, swarm: 'bat', n: 18 }, { t: 90, boss: 'jack' }, { t: 140, swarm: 'slime', n: 24 }, { t: 180, boss: 'king', final: true }] },
-    { name: 'STAGE 2', sub: '沼の賭場', desc: '距離を取って撃つ射手、突進するイノシシ。ボスは毒の沼を作る魔女。',
-      pool: t => [['slime', 4], ['bat', 3], ['boar', t > 10 ? 2.5 : 0], ['archer', t > 20 ? 2.5 : 0], ['brute', t > 60 ? 1 + t / 90 : 0]],
-      hp0: 1.12, hpRate: 1 / 240, spawn: 1.08, eliteMul: 1.15, gemLife: 40,
-      need: lv => 4 + Math.floor(lv * 1.3 + lv * lv * .03),
-      events: [{ t: 45, swarm: 'boar', n: 12 }, { t: 90, boss: 'queen' }, { t: 140, swarm: 'bat', n: 28 }, { t: 180, boss: 'witch', final: true }] },
-    { name: 'STAGE 3', sub: 'ジョーカーの部屋', desc: '全部の敵＋近づくと爆発する爆弾。ボスはジョーカー。',
-      pool: t => [['slime', 3], ['bat', 3], ['boar', 2], ['archer', 2.5], ['bomber', t > 25 ? 1.8 : 0], ['ghost', t > 40 ? 2 : 0], ['brute', t > 50 ? 1.2 + t / 80 : 0]],
-      hp0: 1.25, hpRate: 1 / 220, spawn: 1.15, eliteMul: 1.25, gemLife: 32,
-      need: lv => 4 + Math.floor(lv * 1.3 + lv * lv * .03),
-      events: [{ t: 50, swarm: 'bomber', n: 10 }, { t: 60, boss: 'jack' }, { t: 100, swarm: 'boar', n: 16 }, { t: 120, boss: 'queen' }, { t: 155, swarm: 'bat', n: 30 }, { t: 180, boss: 'joker', final: true }] },
+  // ---------- endless stages ----------
+  const BOSS_AT = 150;
+  const THEMES = [
+    { sub: '緑のフェルト', bg: '#0f3a2e' },
+    { sub: '沼の賭場', bg: '#1f2e24' },
+    { sub: 'ジョーカーの部屋', bg: '#2a1838' },
   ];
-  const BOSS_AT = 180;
-  let unlocked = store.get('cs_unlock', 1);
-  let g, running = false, last = 0, stageIdx = 0, stage = STAGES[0];
+  function stageCfg(n) {
+    const th = THEMES[(n - 1) % 3];
+    const c = { n, name: `STAGE ${n}`, sub: th.sub, bg: th.bg };
+    if (n === 1) {
+      // tutorial: fewer, softer enemies; the brute shows up late
+      Object.assign(c, { hp0: .85, spawn: .8, eliteMul: .7, dmgMul: .8, xpMul: 1, gemLife: Infinity, bomberR: 70,
+        pool: t => [['slime', 6], ['bat', t > 30 ? 3 : 0], ['brute', t > 70 ? .6 : 0]],
+        events: [{ t: 40, swarm: 'bat', n: 12 }, { t: 75, boss: 'jack' }, { t: 115, swarm: 'slime', n: 16 }, { t: BOSS_AT, boss: 'king', final: true }] });
+      return c;
+    }
+    Object.assign(c, {
+      hp0: Math.pow(1.6, n - 1) * .85, spawn: Math.min(2, 1 + (n - 1) * .1), eliteMul: Math.pow(1.6, n - 1) * .75, dmgMul: Math.pow(1.15, n - 1),
+      xpMul: 1 + (n - 1) * .15, gemLife: Math.max(20, 40 - (n - 2) * 5), bomberR: Math.min(115, 70 + Math.max(0, n - 3) * 7),
+    });
+    c.pool = t => {
+      const p = [['slime', 4], ['bat', 3], ['boar', t > 10 ? 2 : 0], ['archer', t > 20 ? 2.5 : 0], ['brute', t > 30 ? 1 + t / 90 : 0]];
+      if (n >= 3) p.push(['bomber', t > 20 ? 1.8 + (n - 3) * .3 : 0], ['ghost', t > 40 ? 2 : 0]);
+      return p;
+    };
+    const finals = ['king', 'witch', 'joker'];
+    const fin = finals[(n - 1) % 3];
+    if (n === 2) c.events = [{ t: 35, swarm: 'boar', n: 12 }, { t: 75, boss: 'queen' }, { t: 115, swarm: 'bat', n: 24 }, { t: BOSS_AT, boss: 'witch', final: true }];
+    else {
+      const mids = ['jack', 'queen', 'king', 'witch'].filter(k => k !== fin);
+      const m1 = mids[(n * 7) % mids.length], m2 = mids[(n * 7 + 1) % mids.length];
+      const sw = ['bomber', 'boar', 'bat'];
+      c.events = [{ t: 35, swarm: sw[n % 3], n: 10 + n }, { t: 60, boss: m1 }, { t: 100, boss: m2 }, { t: 125, swarm: 'bat', n: 22 + n * 2 }, { t: BOSS_AT, boss: fin, final: true }];
+    }
+    return c;
+  }
 
-  function newGame(si) {
-    stageIdx = si; stage = STAGES[si];
+  let g, running = false, last = 0, stage = stageCfg(1);
+  const needFor = lv => 4 + Math.floor(lv * 1.3 + lv * lv * .03);
+
+  function newRun() {
     g = {
-      t: 0, kills: 0, hands: 0, graze: 0, bestLv: -1, bestKey: null, over: false, won: false,
-      lvl: 1, xp: 0, need: stage.need(1), pendingLv: 0, rerolls: 2, choices: [], handCount: {},
+      stageNo: 1, score: 0, kills: 0, hands: 0, graze: 0, bestLv: -1, bestKey: null, playTime: 0,
+      lvl: 1, xp: 0, need: needFor(1), pendingLv: 0, rerolls: 2, choices: [], handCount: {},
       p: { x: 0, y: 0, hp: 100, maxHp: 100, inv: 0, face: 1, step: 0, vx: 0, vy: 0, poison: 0 },
       st: { dmg: 13, rate: .42, shots: 1, pierce: 0, speed: 155, orbit: 0, nova: 0, magnet: 75, bspd: 420 },
-      fireT: 0, novaT: 3, orbA: 0,
-      en: [], bul: [], ebul: [], gems: [], items: [], parts: [], texts: [], rings: [], pools: [], blasts: [],
-      hand: [], spawnAcc: 0, shake: 0, boss: null, evIdx: 0, finalUp: false, hint: 4, nextVac: 25, vacHint: false,
+      hand: [], tipsShown: 0, over: false,
     };
+    resetStage(1);
+  }
+  // stage-local state; the build (stats, level, hand, HP) carries over
+  function resetStage(n) {
+    g.stageNo = n; stage = stageCfg(n);
+    Object.assign(g, {
+      t: 0, won: false, cleared: false, stageKills: 0, fireT: 0, novaT: 3, orbA: 0,
+      en: [], bul: [], ebul: [], gems: [], items: [], parts: [], texts: [], rings: [], pools: [], blasts: [],
+      spawnAcc: 0, shake: 0, boss: null, evIdx: 0, finalUp: false, hint: 4, nextVac: 25, vacHint: n > 1, pendingLv: 0,
+    });
+    Object.assign(g.p, { x: 0, y: 0, vx: 0, vy: 0, inv: 1, poison: 0 });
     renderHand(); hud();
+  }
+  function snapshot() {
+    return { stageNo: g.stageNo, score: g.score, kills: g.kills, hands: g.hands, graze: g.graze, bestLv: g.bestLv, bestKey: g.bestKey, playTime: g.playTime,
+      lvl: g.lvl, xp: g.xp, need: g.need, rerolls: g.rerolls, handCount: g.handCount, hand: g.hand, st: g.st, hp: g.p.hp, maxHp: g.p.maxHp, tipsShown: g.tipsShown };
+  }
+  function restore(s) {
+    newRun();
+    const { hp, maxHp, ...rest } = s;
+    Object.assign(g, rest);
+    g.p.hp = hp; g.p.maxHp = maxHp;
+    resetStage(s.stageNo);
   }
 
   function spawnEnemy(type, x, y) {
     const T = ETYPES[type], a = Math.random() * Math.PI * 2, dist = Math.hypot(VW, VH) / 2 + 40;
     if (x == null) { x = g.p.x + Math.cos(a) * dist; y = g.p.y + Math.sin(a) * dist; }
-    const hpMul = T.elite ? stage.eliteMul : stage.hp0 + g.t * stage.hpRate;
-    const e = { type, ai: T.ai, x, y, r: T.r, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (T.elite ? 1 : 1 + g.t / 500), col: T.col, dmg: T.dmg, xp: T.xp,
+    const hpMul = T.elite ? stage.eliteMul : stage.hp0 * (1 + g.t / 260);
+    const e = { type, ai: T.ai, x, y, r: T.r, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (T.elite ? 1 : 1 + g.t / 500), col: T.col,
+      dmg: Math.round(T.dmg * stage.dmgMul), xp: T.xp,
       flash: 0, wob: rand(0, 6), kx: 0, ky: 0, orbHit: 0, st: 0, stT: rand(1, 3), cd: rand(0, 2), side: Math.random() < .5 ? 1 : -1,
-      elite: !!T.elite, name: T.elite, glyph: T.glyph, ang: 0 };
+      elite: !!T.elite, name: T.elite, glyph: T.glyph, ang: 0, dashLen: 0, dashSpd: 0, buff: false };
     g.en.push(e);
     return e;
   }
@@ -412,15 +508,17 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     sfx('hit', 45, () => tone(rand(180, 240), .03, 'square', .015));
     if (e.hp <= 0) killEnemy(e);
   }
-  function killEnemy(e) {
+  function killEnemy(e, silent) {
     if (e.dead) return;
-    e.dead = true; g.kills++;
+    e.dead = true;
+    if (!silent) { g.kills++; g.stageKills++; }
     for (let i = 0; i < (e.elite ? 30 : 6); i++) { const a = Math.random() * 7, v = rand(40, e.elite ? 260 : 140); g.parts.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: e.elite ? .9 : .45, col: e.col }); }
-    if (e.xp) { const v = e.xp * (1 + stageIdx * .35); dropXp(e.x, e.y, Math.floor(v) + (Math.random() < v % 1 ? 1 : 0)); }
-    if (!e.elite && Math.random() < .015) g.items.push({ kind: 'heart', x: e.x, y: e.y, t: 0 });
+    if (e.xp && !silent) { const v = e.xp * stage.xpMul; dropXp(e.x, e.y, Math.floor(v) + (Math.random() < v % 1 ? 1 : 0)); }
+    const heartP = e.type === 'brute' ? .12 : .012;
+    if (!e.elite && !silent && Math.random() < heartP) g.items.push({ kind: 'heart', x: e.x, y: e.y, t: 0 });
     if (e.elite) {
       g.shake = 10; buzz([40, 30, 120]);
-      if (e.final) return winGame();
+      if (e.final) return winStage();
       g.items.push({ kind: 'chest', x: e.x, y: e.y, t: 0 }, { kind: 'heart', x: e.x + 30, y: e.y, t: 0 });
       banner('撃破！', '宝箱をひろおう');
       if (g.boss === e) g.boss = g.en.find(o => o.elite && !o.dead && o !== e) || null;
@@ -436,7 +534,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   }
   function gainXp(v) {
     g.xp += v;
-    while (g.xp >= g.need) { g.xp -= g.need; g.lvl++; g.need = stage.need(g.lvl); g.pendingLv++; }
+    while (g.xp >= g.need) { g.xp -= g.need; g.lvl++; g.need = needFor(g.lvl); g.pendingLv++; }
     if (g.pendingLv > 0 && running) openLevelUp();
   }
 
@@ -451,6 +549,11 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
     return ch;
   }
+  const TIPS = [
+    '<b>同じ数字</b>を2枚でワンペア、3枚でスリーカード。<b>同じマーク</b>を5枚でフラッシュ。カードの下に、選ぶと近づく役と効果が出ます。',
+    'カードは<b>数字が大きいほど</b>マークの効果が大きい（Aが最大）。役を取るか、強い数字を取るか考えよう。',
+    'いらない並びなら<b>引き直す</b>。宝箱の<b>★ワイルド</b>は何のカードにもなる。',
+  ];
   function openLevelUp() {
     running = false; joy.id = null;
     g.choices = makeChoices();
@@ -460,23 +563,36 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   }
   function cardHTML(c) { return `<span class="rk">${RL(c.r)}</span><span class="st">${SYM[c.s]}</span>`; }
   const miniRow = hand => Array.from({ length: 5 }, (_, i) => { const c = hand[i]; return c ? `<div class="mini has" data-s="${c.s}">${cardHTML(c)}</div>` : '<div class="mini"></div>'; }).join('');
+  function optionResult(c) {
+    const nh = [...g.hand, c];
+    if (nh.length === 5) { const k = evalBest(nh); return { key: k, done: true }; }
+    return { key: partialKey(nh), done: false, flush: flushDraw(nh) };
+  }
   function renderLevelUp() {
     $('lvTitle').textContent = `LEVEL ${g.lvl - g.pendingLv + 1}!`;
+    const tipOn = g.stageNo === 1 && g.tipsShown < TIPS.length;
+    $('lvTip').hidden = !tipOn; if (tipOn) $('lvTip').innerHTML = TIPS[g.tipsShown];
     $('lvHand').innerHTML = miniRow(g.hand);
+    const hits = new Set();
     $('opts').innerHTML = g.choices.map((c, i) => {
-      const nh = [...g.hand, c];
+      const r = optionResult(c);
       let prev;
-      if (nh.length === 5) { const k = evalBest(nh); prev = `<span class="prev done">→ ${HANDS[k].name}<br>${HANDS[k].desc}</span>`; }
-      else prev = `<span class="prev">→ ${partialName(nh)}</span>`;
+      if (r.done) { hits.add(r.key); prev = `<span class="prev done">${HANDS[r.key].name} 完成<small>${HANDS[r.key].desc}</small></span>`; }
+      else if (r.key) { hits.add(r.key); prev = `<span class="prev">→ ${HANDS[r.key].name}<small>${HANDS[r.key].desc}</small></span>`; }
+      else if (r.flush) { hits.add('flush'); prev = `<span class="prev">→ フラッシュ狙い<small>${HANDS.flush.desc}</small></span>`; }
+      else prev = `<span class="prev" style="color:var(--muted)">役なし<small>このまま5枚ならブタ</small></span>`;
       return `<button class="opt" type="button" id="opt${i}" data-i="${i}" aria-label="${SYM[c.s]}${RL(c.r)}を取る">
-        <div class="face" data-s="${c.s}">${cardHTML(c)}</div><span class="bonus">${SUIT_BONUS[c.s]}</span>${prev}</button>`;
+        <div class="face" data-s="${c.s}">${cardHTML(c)}</div><span class="bonus">${SYM[c.s]} ${bonusText(c)}</span>${prev}</button>`;
     }).join('');
     $('rerollBtn').textContent = `引き直す（残り${g.rerolls}）`;
     $('rerollBtn').disabled = g.rerolls <= 0;
+    $('lvGrid').innerHTML = HAND_ORDER.filter(k => k !== 'royal').map(k =>
+      `<div class="${hits.has(k) ? 'hit' : ''}"><b>${k === 'sf' ? 'ストフラ/ロイヤル' : HANDS[k].name}</b><span>${HANDS[k].desc}</span></div>`).join('');
   }
   $('opts').addEventListener('click', e => {
     const b = e.target.closest('.opt'); if (!b) return;
     const c = g.choices[+b.dataset.i];
+    if (g.stageNo === 1 && g.tipsShown < TIPS.length) g.tipsShown++;
     g.pendingLv--;
     $('lvOv').hidden = true;
     addCard(c);
@@ -487,11 +603,11 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 
   function heal(n) { const p = g.p; const before = p.hp; p.hp = Math.min(p.maxHp, p.hp + n); if (p.hp > before) floatText(p.x, p.y - 28, `+${Math.round(p.hp - before)}`, '#6ad37a', 14); }
   function suitBonus(c) {
-    const s = g.st;
-    if (c.s === 's') s.dmg *= 1.08;
-    else if (c.s === 'h') heal(8);
-    else if (c.s === 'd') s.rate *= .93;
-    else if (c.s === 'c') { s.speed *= 1.04; s.magnet *= 1.12; }
+    const s = g.st, n = suitNums(c);
+    if (c.s === 's') s.dmg *= 1 + n.atk / 100;
+    else if (c.s === 'h') { g.p.maxHp += n.mhp; heal(n.heal); }
+    else if (c.s === 'd') s.rate *= 1 - n.rate / 100;
+    else if (c.s === 'c') { s.speed *= 1 + n.spd / 100; s.magnet *= 1 + n.mag / 100; }
   }
   function applyHand(key) {
     const s = g.st, p = g.p;
@@ -513,6 +629,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     if (g.hand.length === 5) {
       const key = evalBest(g.hand), h = HANDS[key];
       g.hands++; g.handCount[key] = (g.handCount[key] || 0) + 1;
+      const hist = store.get('cs2_hist', {}); hist[key] = (hist[key] || 0) + 1; store.set('cs2_hist', hist);
       if (h.lv > g.bestLv) { g.bestLv = h.lv; g.bestKey = key; }
       applyHand(key);
       banner(h.name, h.desc);
@@ -527,6 +644,13 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     $('slots').innerHTML = miniRow(g.hand);
     $('handInfo').innerHTML = g.hand.length ? `いまの手札：${partialName(g.hand)}` : 'レベルアップでカードを選んで役を作ろう';
   }
+  function handTable(countsObj, highlight) {
+    return HAND_ORDER.filter(k => k !== 'royal').map(k => {
+      const nm = k === 'sf' ? 'ストレートフラッシュ<br>ロイヤルフラッシュ' : HANDS[k].name;
+      const c = (countsObj[k] || 0) + (k === 'sf' ? (countsObj.royal || 0) : 0);
+      return `<tr${highlight === k ? ' class="now"' : ''}><td>${nm}</td><td>${HANDS[k].desc}</td><td class="cnt${c ? '' : ' zero'}">${c}回</td></tr>`;
+    }).join('');
+  }
 
   // ---------- hazards ----------
   function eb(x, y, a, spd, col = '#ff8fb1', r = 6) { g.ebul.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r, col, grazed: false, life: 7 }); }
@@ -536,16 +660,16 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     for (let i = 0; i < n; i++) eb(x, y, base + (i - (n - 1) / 2) * spread, spd, col);
   }
   function addPool(x, y, r, life, warn = .9) { g.pools.push({ x, y, r, life, warn, t: 0, follow: null }); }
+  // telegraphed dash: the drawn lane is exactly where the body will travel
+  function aimDash(e, d, dx, dy, over, maxLen, spd) { e.ang = Math.atan2(dy, dx); e.dashLen = Math.min(d + over, maxLen); e.dashSpd = spd; e.ox = e.x; e.oy = e.y; }
 
-  // ---------- enemy behaviour ----------
-  // returns desired velocity; some states move the enemy directly
+  // ---------- enemy behaviour (returns desired velocity) ----------
   function think(e, dt, dx, dy, d) {
     const p = g.p, ux = dx / d, uy = dy / d;
     e.stT -= dt; e.cd -= dt;
     switch (e.ai) {
       case 'weave': { const w = Math.sin(e.wob * .6) * .7; return [(ux * Math.cos(w) - uy * Math.sin(w)) * e.spd, (uy * Math.cos(w) + ux * Math.sin(w)) * e.spd]; }
       case 'archer': {
-        // keeps its distance and shoots
         let vx, vy;
         if (d > 270) { vx = ux * e.spd; vy = uy * e.spd; }
         else if (d < 200) { vx = -ux * e.spd; vy = -uy * e.spd; }
@@ -554,30 +678,31 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
         return [vx, vy];
       }
       case 'tackle': {
-        if (e.st === 0) { if (d < 210 && e.cd <= 0) { e.st = 1; e.stT = .75; e.ang = Math.atan2(dy, dx); } return [ux * e.spd, uy * e.spd]; }
-        if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = .5; sfx('dash', 80, () => tone(150, .15, 'sawtooth', .03, 0, 90)); } return [0, 0]; }
-        if (e.st === 2) { if (e.stT <= 0) { e.st = 3; e.stT = .7; } return [Math.cos(e.ang) * 340, Math.sin(e.ang) * 340]; }
+        if (e.st === 0) { if (d < 240 && e.cd <= 0) { e.st = 1; e.stT = .75; aimDash(e, d, dx, dy, 70, 320, 380); } return [ux * e.spd, uy * e.spd]; }
+        if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = e.dashLen / e.dashSpd; sfx('dash', 80, () => tone(150, .15, 'sawtooth', .03, 0, 90)); } return [0, 0]; }
+        if (e.st === 2) { if (e.stT <= 0) { e.st = 3; e.stT = .7; } return [Math.cos(e.ang) * e.dashSpd, Math.sin(e.ang) * e.dashSpd]; }
         if (e.stT <= 0) { e.st = 0; e.cd = rand(1.5, 2.5); } return [ux * e.spd * .3, uy * e.spd * .3];
       }
       case 'bomber': {
-        if (e.st === 0) { if (d < 60) { e.st = 1; e.stT = .8; } return [ux * e.spd, uy * e.spd]; }
-        if (e.stT <= 0) { explode(e); } return [ux * 15, uy * 15];
+        const R2 = stage.bomberR;
+        if (e.st === 0) { if (d < R2 * .55) { e.st = 1; e.stT = .9; } return [ux * e.spd, uy * e.spd]; }
+        if (e.stT <= 0) explode(e);
+        return [ux * e.spd * .65, uy * e.spd * .65];
       }
       case 'jack': {
-        // three telegraphed tackles in a row
-        if (e.st === 0) { if (e.stT <= 0) { e.st = 1; e.stT = .55; e.combo = 3; e.ang = Math.atan2(dy, dx); } return [ux * e.spd, uy * e.spd]; }
-        if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = .42; tone(120, .25, 'sawtooth', .05, 0, 60); } return [0, 0]; }
+        if (e.st === 0) { if (e.stT <= 0) { e.st = 1; e.stT = .55; e.combo = 3; aimDash(e, d, dx, dy, 90, 380, 430); } return [ux * e.spd, uy * e.spd]; }
+        if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = e.dashLen / e.dashSpd; tone(120, .25, 'sawtooth', .05, 0, 60); } return [0, 0]; }
         if (e.st === 2) {
-          if (e.stT <= 0) { e.combo--; if (e.combo > 0) { e.st = 1; e.stT = .45; e.ang = Math.atan2(dy, dx); } else { e.st = 0; e.stT = 3.2; fireRing(e.x, e.y, 10, 100, Math.random(), '#7fe0d8'); } }
-          return [Math.cos(e.ang) * 430, Math.sin(e.ang) * 430];
+          if (e.stT <= 0) { e.combo--; if (e.combo > 0) { e.st = 1; e.stT = .45; aimDash(e, d, dx, dy, 90, 380, 430); } else { e.st = 0; e.stT = 3.2; fireRing(e.x, e.y, 10, 100, Math.random(), '#7fe0d8'); } return [0, 0]; }
+          return [Math.cos(e.ang) * e.dashSpd, Math.sin(e.ang) * e.dashSpd];
         }
         return [0, 0];
       }
       case 'king': {
-        if (e.st === 0) { if (e.stT <= 0) { e.st = 1; e.stT = .8; e.ang = Math.atan2(dy, dx); } else if (e.cd <= 0) { e.cd = 1.6; fireAt(e.x, e.y, 140, 3, .25, '#ffd27a'); } return [ux * e.spd, uy * e.spd]; }
-        if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = .6; tone(110, .3, 'sawtooth', .05, 0, 60); } return [0, 0]; }
-        if (e.stT <= 0) { e.st = 0; e.stT = 3.2; fireRing(e.x, e.y, e.hp < e.maxHp / 2 ? 16 : 12, 110, Math.random(), '#ffd27a'); }
-        return [Math.cos(e.ang) * 420, Math.sin(e.ang) * 420];
+        if (e.st === 0) { if (e.stT <= 0) { e.st = 1; e.stT = .8; aimDash(e, d, dx, dy, 100, 420, 420); } else if (e.cd <= 0) { e.cd = 1.6; fireAt(e.x, e.y, 140, 3, .25, '#ffd27a'); } return [ux * e.spd, uy * e.spd]; }
+        if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = e.dashLen / e.dashSpd; tone(110, .3, 'sawtooth', .05, 0, 60); } return [0, 0]; }
+        if (e.stT <= 0) { e.st = 0; e.stT = 3.2; fireRing(e.x, e.y, e.hp < e.maxHp / 2 ? 16 : 12, 110, Math.random(), '#ffd27a'); return [0, 0]; }
+        return [Math.cos(e.ang) * e.dashSpd, Math.sin(e.ang) * e.dashSpd];
       }
       case 'queen': {
         if (e.stT <= 0) {
@@ -620,11 +745,11 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
   }
   function explode(e) {
-    const R2 = 78;
+    const R2 = stage.bomberR;
     g.blasts.push({ x: e.x, y: e.y, r: R2, t: 0 });
-    if (Math.hypot(g.p.x - e.x, g.p.y - e.y) < R2) hurt(20, 'blast');
+    if (Math.hypot(g.p.x - e.x, g.p.y - e.y) < R2) hurt(Math.round(20 * stage.dmgMul), 'blast');
     for (const o of g.en) if (o !== e && !o.dead && Math.hypot(o.x - e.x, o.y - e.y) < R2) hitEnemy(o, 40);
-    e.xp = 0; killEnemy(e); g.kills--;
+    killEnemy(e, true);
     g.shake = Math.max(g.shake, 5); sfx('boom', 60, () => tone(80, .3, 'sawtooth', .06, 0, 40));
   }
 
@@ -643,20 +768,18 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 
   // ---------- update ----------
   function update(dt) {
-    g.t += dt; g.hint -= dt;
+    g.t += dt; g.playTime += dt; g.hint -= dt;
     const p = g.p, s = g.st, inp = inputVec();
     p.vx += (inp.x * s.speed - p.vx) * Math.min(1, dt * 12); p.vy += (inp.y * s.speed - p.vy) * Math.min(1, dt * 12);
     p.x += p.vx * dt; p.y += p.vy * dt; if (Math.abs(p.vx) > 5) p.face = Math.sign(p.vx);
     p.step += Math.hypot(p.vx, p.vy) * dt * .05; p.inv -= dt;
 
-    // timeline
     const evs = stage.events;
     while (g.evIdx < evs.length && g.t >= evs[g.evIdx].t) {
       const ev = evs[g.evIdx++];
       if (ev.swarm) swarm(ev.swarm, ev.n);
       else { spawnElite(ev.boss, ev.final); if (ev.final) g.finalUp = true; }
     }
-    // all-in chip
     g.nextVac -= dt;
     if (g.nextVac <= 0 && !g.items.some(it => it.kind === 'vac')) {
       const a = Math.random() * Math.PI * 2, d = rand(520, 780);
@@ -696,7 +819,6 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
     g.bul = g.bul.filter(b => b.life > 0);
 
-    // orbiters
     g.orbA += dt * 3.4;
     for (let i = 0; i < s.orbit; i++) {
       const a = g.orbA + i * Math.PI * 2 / s.orbit, ox = p.x + Math.cos(a) * 64, oy = p.y + Math.sin(a) * 64;
@@ -706,7 +828,6 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       }
       for (const b of g.ebul) if ((b.x - ox) ** 2 + (b.y - oy) ** 2 < 14 * 14) b.life = 0;
     }
-    // nova
     if (s.nova > 0) {
       g.novaT -= dt;
       if (g.novaT <= 0) {
@@ -719,13 +840,19 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       }
     }
 
-    // enemies
-    const CONTACT = 13;
+    // brutes rally nearby enemies: they move faster while inside the red aura
+    for (const e of g.en) e.buff = false;
+    for (const b of g.en) {
+      if (b.ai !== 'brute' || b.dead) continue;
+      for (const e of g.en) if (e !== b && !e.elite && (e.x - b.x) ** 2 + (e.y - b.y) ** 2 < BRUTE_AURA * BRUTE_AURA) e.buff = true;
+    }
+
     for (const e of g.en) {
       if (e.dead) continue;
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
-      const [vx, vy] = think(e, dt, dx, dy, d);
+      let [vx, vy] = think(e, dt, dx, dy, d);
       if (e.dead) continue;
+      if (e.buff && e.st !== 2) { vx *= 1.4; vy *= 1.4; }
       e.x += (vx + e.kx * 60) * dt; e.y += (vy + e.ky * 60) * dt;
       e.kx *= .85; e.ky *= .85; e.flash -= dt; e.wob += dt * 6;
       if (e.dmg && d < e.r + CONTACT) hurt(e.dmg, e.type);
@@ -734,7 +861,6 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     separate();
     g.en = g.en.filter(e => !e.dead);
 
-    // pools (poison swamp): damage over time while standing inside, no invincibility
     let inPool = false;
     for (const pl of g.pools) {
       pl.t += dt; pl.life -= dt;
@@ -744,16 +870,15 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     g.pools = g.pools.filter(pl => pl.life > 0);
     p.poison = inPool ? Math.min(1, p.poison + dt * 4) : Math.max(0, p.poison - dt * 3);
     if (inPool && !g.won) {
-      p.hp -= 16 * dt;
+      p.hp -= 16 * stage.dmgMul * dt;
       sfx('poison', 400, () => { floatText(p.x, p.y - 26, '毒', '#9be15a', 13); tone(220, .08, 'sine', .03, 0, 160); });
-      if (p.hp <= 0) endGame(false);
+      if (p.hp <= 0) endRun();
     }
 
-    // enemy bullets + graze
     for (const b of g.ebul) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
       const d = Math.hypot(b.x - p.x, b.y - p.y);
-      if (d < b.r + 7) { b.life = 0; hurt(10, 'bullet'); }
+      if (d < b.r + 7) { b.life = 0; hurt(Math.round(10 * stage.dmgMul), 'bullet'); }
       else if (d < 30 && !b.grazed) {
         b.grazed = true; g.graze++; gainXp(1);
         g.parts.push({ x: p.x + (b.x - p.x) * .5, y: p.y + (b.y - p.y) * .5, vx: 0, vy: -30, life: .3, col: '#ffffff' });
@@ -762,7 +887,6 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
     g.ebul = g.ebul.filter(b => b.life > 0);
 
-    // xp chips
     const mag = s.magnet;
     g.gems = g.gems.filter(gm => {
       gm.t += dt;
@@ -776,7 +900,6 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       }
       return gm.pull || gm.vac || gm.t < stage.gemLife;
     });
-    // items
     g.items = g.items.filter(it => {
       it.t += dt;
       const d = Math.hypot(p.x - it.x, p.y - it.y);
@@ -809,14 +932,14 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     floatText(p.x, p.y - 26, `-${dmg}`, '#ff5a6a', 16);
     for (const q of g.en) { if (q.elite) continue; const qd = Math.hypot(q.x - p.x, q.y - p.y) || 1; if (qd < 110) { q.kx += (q.x - p.x) / qd * 7; q.ky += (q.y - p.y) / qd * 7; } }
     for (const b of g.ebul) if (Math.hypot(b.x - p.x, b.y - p.y) < 70) b.life = 0;
-    if (p.hp <= 0) endGame(false);
+    if (p.hp <= 0) endRun();
   }
 
   function separate() {
     const cell = 40, grid = new Map();
     for (const e of g.en) { if (e.dead || e.ai === 'ghost') continue; const k = (Math.floor(e.x / cell) * 73856093) ^ (Math.floor(e.y / cell) * 19349663); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(e); }
     for (const e of g.en) {
-      if (e.dead || e.ai === 'ghost') continue;
+      if (e.dead || e.ai === 'ghost' || e.st === 2) continue;
       const cx = Math.floor(e.x / cell), cy = Math.floor(e.y / cell);
       for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
         const a = grid.get(((cx + ox) * 73856093) ^ ((cy + oy) * 19349663)); if (!a) continue;
@@ -829,30 +952,54 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
   }
 
-  function bestKey() { return 'cs_best_s' + (stageIdx + 1); }
-  function scoreOf() { return g.kills * 10 + Math.floor(g.t) * 5 + g.graze * 2 + (g.won ? 3000 * (stageIdx + 1) : 0); }
-  function winGame() {
+  // ---------- stage flow ----------
+  function stageScore() { return g.stageKills * 10 + Math.floor(g.t) * 5 + 3000 * g.stageNo; }
+  function winStage() {
     g.won = true; g.ebul = []; g.pools = [];
     for (const e of g.en) e.dead = true;
-    banner('ステージクリア！', STAGES[stageIdx + 1] ? `${STAGES[stageIdx + 1].name} が解放` : '全ステージ制覇！');
-    if (stageIdx + 2 > unlocked && STAGES[stageIdx + 1]) { unlocked = stageIdx + 2; store.set('cs_unlock', unlocked); }
-    setTimeout(() => endGame(true), 1200);
+    banner(`${stage.name} クリア！`, '');
+    setTimeout(showClear, 1200);
   }
-  function endGame(won) {
+  function showClear() {
+    if (g.cleared || g.over) return;
+    g.cleared = true; running = false;
+    g.score += stageScore();
+    const n = g.stageNo;
+    // prepare the next stage now so the save is ready even if the page closes
+    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * .3); g.rerolls++;
+    g.stageNo = n + 1;
+    const snap = snapshot(); g.stageNo = n;
+    store.set('cs2_save', snap);
+    recordBest(n);
+    $('cTitle').textContent = `STAGE ${n} CLEAR!`;
+    $('cScore').textContent = g.score.toLocaleString(); $('cLv').textContent = g.lvl;
+    $('cHp').textContent = `${Math.ceil(g.p.hp)} / ${g.p.maxHp}`; $('cHands').textContent = g.hands + '回';
+    const nx = stageCfg(n + 1);
+    $('cNext').textContent = `次は STAGE ${n + 1}「${nx.sub}」。敵のHP ×${nx.hp0.toFixed(1)}、ボスは${ETYPES[nx.events[nx.events.length - 1].boss].elite.split(' ')[1]}。`;
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .2, 'square', .04, i * .1));
+    $('clearOv').hidden = false;
+  }
+  function recordBest(stageReached) {
+    const bs = store.get('cs2_best_stage', 0);
+    if (stageReached > bs) store.set('cs2_best_stage', stageReached);
+  }
+  function endRun() {
     if (g.over) return;
-    running = false; g.over = true; g.won = won;
-    const sc = scoreOf(), prev = store.get(bestKey(), 0), isBest = sc > prev; if (isBest) store.set(bestKey(), sc);
-    $('eTitle').textContent = won ? `${stage.name} CLEAR!` : 'GAME OVER';
-    $('eScore').textContent = sc.toLocaleString(); $('eBest').hidden = !isBest;
-    $('eTime').textContent = Math.floor(g.t / 60) + '分' + String(Math.floor(g.t % 60)).padStart(2, '0') + '秒';
+    running = false; g.over = true;
+    g.score += g.stageKills * 10 + Math.floor(g.t) * 5 + g.graze * 2;
+    store.del('cs2_save');
+    store.set('cs2_runs', store.get('cs2_runs', 0) + 1);
+    recordBest(g.stageNo - 1);
+    const prevBest = store.get('cs2_best_score', 0), isBest = g.score > prevBest;
+    if (isBest) store.set('cs2_best_score', g.score);
+    $('eTitle').textContent = 'GAME OVER';
+    $('eStage').innerHTML = `<b>STAGE ${g.stageNo}</b> で力尽きた（クリア ${g.stageNo - 1} ステージ）`;
+    $('eScore').textContent = g.score.toLocaleString(); $('eBest').hidden = !isBest;
+    $('eTime').textContent = Math.floor(g.playTime / 60) + '分' + String(Math.floor(g.playTime % 60)).padStart(2, '0') + '秒';
     $('eKill').textContent = g.kills; $('eLv').textContent = g.lvl; $('eGraze').textContent = g.graze;
-    $('eHands').textContent = g.hands + '回';
-    $('eBestHand').textContent = g.bestKey ? HANDS[g.bestKey].name : '—';
-    const next = won && STAGES[stageIdx + 1];
-    $('retryBtn').textContent = next ? `${STAGES[stageIdx + 1].name}へ` : 'もう一回';
-    $('retryBtn').dataset.next = next ? stageIdx + 1 : stageIdx;
-    if (won) { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .2, 'square', .04, i * .1)); } else { tone(200, .6, 'sawtooth', .06, 0, 60); buzz([100, 50, 200]); }
-    setTimeout(() => { $('endOv').hidden = false; }, won ? 300 : 800);
+    $('eTable').innerHTML = handTable(g.handCount);
+    tone(200, .6, 'sawtooth', .06, 0, 60); buzz([100, 50, 200]);
+    setTimeout(() => { $('endOv').hidden = false; }, 800);
   }
 
   // ---------- drawing ----------
@@ -877,16 +1024,25 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     ctx.arc(-e.r * .3 + Math.cos(look) * 2, -e.r * .15 + Math.sin(look) * 2, er, 0, 7);
     ctx.arc(e.r * .3 + Math.cos(look) * 2, -e.r * .15 + Math.sin(look) * 2, er, 0, 7); ctx.fill();
   }
-  function telegraphLine(e, len, width) {
-    ctx.save(); ctx.strokeStyle = 'rgba(255,90,106,.45)'; ctx.lineWidth = width; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.ang) * len, e.y + Math.sin(e.ang) * len); ctx.stroke(); ctx.restore();
+  function dashLane(e) {
+    // lane width = body radius + player contact radius on each side, so the drawing is the true danger zone
+    const half = e.r + CONTACT, a = .3 + .25 * Math.sin(e.stT * 18);
+    ctx.save(); ctx.strokeStyle = `rgba(255,90,106,${a})`; ctx.lineWidth = half * 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(e.ox, e.oy); ctx.lineTo(e.ox + Math.cos(e.ang) * e.dashLen, e.oy + Math.sin(e.ang) * e.dashLen); ctx.stroke(); ctx.restore();
   }
   function drawEnemy(e, p) {
-    // telegraphs first, under the body
-    if ((e.ai === 'tackle' || e.ai === 'jack' || e.ai === 'king') && e.st === 1) telegraphLine(e, e.ai === 'tackle' ? 170 : 260, e.r * 1.2);
-    if (e.ai === 'bomber' && e.st === 1) { ctx.strokeStyle = `rgba(255,90,106,${.4 + .4 * Math.sin(e.stT * 30)})`; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(e.x, e.y, 78, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    if ((e.ai === 'tackle' || e.ai === 'jack' || e.ai === 'king') && e.st === 1) dashLane(e);
+    if (e.ai === 'bomber' && e.st === 1) {
+      ctx.fillStyle = `rgba(255,90,106,${.12 + .1 * Math.sin(e.stT * 30)})`; ctx.beginPath(); ctx.arc(e.x, e.y, stage.bomberR, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,90,106,.8)'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(e.x, e.y, stage.bomberR, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (e.ai === 'brute') {
+      ctx.strokeStyle = 'rgba(255,90,80,.28)'; ctx.lineWidth = 2; ctx.setLineDash([3, 6]);
+      ctx.beginPath(); ctx.arc(e.x, e.y, BRUTE_AURA, e.wob * .2, e.wob * .2 + 7); ctx.stroke(); ctx.setLineDash([]);
+    }
     ctx.save(); ctx.translate(e.x, e.y);
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, e.r * .9, e.r * .9, e.r * .3, 0, 0, 7); ctx.fill();
+    if (e.buff) { ctx.fillStyle = 'rgba(255,90,80,.35)'; ctx.beginPath(); ctx.arc(0, 0, e.r + 4, 0, 7); ctx.fill(); }
     const col = e.flash > 0 ? '#ffffff' : e.col;
     ctx.fillStyle = col;
     if (e.ai === 'weave') {
@@ -898,12 +1054,11 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       for (let i = 0; i < 4; i++) ctx.lineTo(e.r - (i + .5) * e.r / 2, e.r - (i % 2 ? 0 : 5) + Math.sin(e.wob + i) * 2);
       ctx.lineTo(-e.r, e.r); ctx.fill(); ctx.globalAlpha = 1; eyes(e, p, 2);
     } else if (e.ai === 'archer') {
-      // a spade with a bow; glows right before it shoots
       ctx.font = `bold ${e.r * 2.6}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.strokeStyle = '#c9d4ff'; ctx.lineWidth = 2; ctx.strokeText('♠', 0, 0); ctx.fillText('♠', 0, 0);
       const look = Math.atan2(p.y - e.y, p.x - e.x);
       ctx.strokeStyle = '#c9a26b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(Math.cos(look) * e.r, Math.sin(look) * e.r, 7, look - 1.3, look + 1.3); ctx.stroke();
-      if (e.stT < .5) { ctx.fillStyle = `rgba(201,212,255,${1 - e.stT * 2})`; ctx.beginPath(); ctx.arc(Math.cos(look) * e.r, Math.sin(look) * e.r, 4, 0, 7); ctx.fill(); }
+      if (e.stT < .5) { ctx.fillStyle = `rgba(201,212,255,${clamp(1 - e.stT * 2, 0, 1)})`; ctx.beginPath(); ctx.arc(Math.cos(look) * e.r, Math.sin(look) * e.r, 4, 0, 7); ctx.fill(); }
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-3, -2, 1.6, 0, 7); ctx.arc(3, -2, 1.6, 0, 7); ctx.fill();
     } else if (e.ai === 'tackle') {
       ctx.save(); ctx.rotate(Math.PI / 4); ctx.fillRect(-e.r * .75, -e.r * .75, e.r * 1.5, e.r * 1.5); ctx.restore();
@@ -914,7 +1069,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       const blink = e.st === 1 && Math.floor(e.stT * 12) % 2;
       ctx.fillStyle = blink ? '#ffffff' : col; ctx.beginPath(); ctx.arc(0, 0, e.r, 0, 7); ctx.fill();
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -e.r); ctx.quadraticCurveTo(4, -e.r - 6, 2, -e.r - 9); ctx.stroke();
-      ctx.fillStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(2, -e.r - 10, 2.5 + Math.sin(e.wob * 3), 0, 7); ctx.fill();
+      ctx.fillStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(2, -e.r - 10, Math.max(.5, 2.5 + Math.sin(e.wob * 3)), 0, 7); ctx.fill();
       eyes(e, p, 1.8);
     } else if (e.elite) {
       const w = e.r * 1.4, h = e.r * 1.9, tilt = Math.sin(e.wob * .5) * .08;
@@ -924,22 +1079,28 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       ctx.fillStyle = e.col; ctx.font = `bold ${e.r * .9}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(e.glyph, 0, -e.r * .15);
       ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-e.r * .25, e.r * .45, 3, 0, 7); ctx.arc(e.r * .25, e.r * .45, 3, 0, 7); ctx.fill();
+    } else if (e.ai === 'brute') {
+      // a drummer: beats the drum to rally nearby enemies
+      const beat = Math.sin(e.wob * 1.5);
+      ctx.beginPath(); ctx.ellipse(0, 0, e.r, e.r * .95, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#f1e2c4'; ctx.beginPath(); ctx.ellipse(0, e.r * .45, e.r * .55, e.r * .3, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#7a3a26'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = '#2a1410'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(e.r * .7, -e.r * .1); ctx.lineTo(e.r * .25, e.r * (.3 + beat * .15)); ctx.stroke();
+      eyes(e, p, 2.4);
+      if (e.hp < e.maxHp) { ctx.fillStyle = '#300'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2, 4); ctx.fillStyle = '#ff5a6a'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4); }
     } else {
       const sq = 1 + Math.sin(e.wob) * .08;
       ctx.beginPath(); ctx.ellipse(0, 0, e.r * sq, e.r / sq, 0, 0, 7); ctx.fill();
-      if (e.type === 'brute') { ctx.fillStyle = '#2a1410'; ctx.fillRect(-e.r * .7, -e.r * .2, e.r * 1.4, 3); }
       eyes(e, p, Math.max(1.8, e.r * .13));
-      if (e.type === 'brute' && e.hp < e.maxHp) { ctx.fillStyle = '#300'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2, 4); ctx.fillStyle = '#ff5a6a'; ctx.fillRect(-e.r, -e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 4); }
     }
     ctx.restore();
   }
   function drawPools() {
     for (const pl of g.pools) {
-      const active = pl.t > pl.warn;
-      const fade = pl.life < 1 ? pl.life : 1;
+      const active = pl.t > pl.warn, fade = pl.life < 1 ? Math.max(0, pl.life) : 1;
       if (!active) {
         ctx.strokeStyle = `rgba(155,225,90,${.4 + .3 * Math.sin(pl.t * 20)})`; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
-        ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.r * (pl.t / pl.warn), 0, 7); ctx.stroke();
+        ctx.beginPath(); ctx.arc(pl.x, pl.y, Math.max(1, pl.r * (pl.t / pl.warn)), 0, 7); ctx.stroke();
         ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
         continue;
       }
@@ -962,11 +1123,10 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     if (label) { ctx.rotate(-a); ctx.font = '800 9px "Bungee", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(label, -Math.cos(a) * 18, -Math.sin(a) * 18 + 3); }
     ctx.restore();
   }
-  const BG = ['#0f3a2e', '#1f2e24', '#2a1838'];
   function draw() {
     const p = g.p;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.fillStyle = BG[stageIdx]; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = stage.bg; ctx.fillRect(0, 0, W, H);
     ctx.setTransform(DPR * S, 0, 0, DPR * S, 0, 0);
     const sx = g.shake ? rand(-g.shake, g.shake) : 0, sy = g.shake ? rand(-g.shake, g.shake) : 0;
     const cx = p.x - VW / 2 + sx, cy = p.y - VH / 2 + sy;
@@ -995,8 +1155,8 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
     for (const e of g.en) drawEnemy(e, p);
     for (const b of g.bul) drawCardShape(b.x, b.y, 9, 12, null, b.a);
-    for (const r of g.rings) { ctx.strokeStyle = r.col; ctx.globalAlpha = 1 - r.r / r.max; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke(); }
-    for (const b of g.blasts) { ctx.globalAlpha = 1 - b.t / .35; ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (.5 + b.t / .7), 0, 7); ctx.fill(); }
+    for (const r of g.rings) { ctx.strokeStyle = r.col; ctx.globalAlpha = clamp(1 - r.r / r.max, 0, 1); ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(r.x, r.y, Math.max(0, r.r), 0, 7); ctx.stroke(); }
+    for (const b of g.blasts) { ctx.globalAlpha = clamp(1 - b.t / .35, 0, 1); ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(0, b.r * (.6 + b.t / .9)), 0, 7); ctx.fill(); }
     ctx.globalAlpha = 1;
     if (!(p.inv > 0 && Math.floor(p.inv * 12) % 2)) {
       const bob = Math.sin(p.step * 6) * 2;
@@ -1018,22 +1178,19 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * .45, 0, 7); ctx.fill();
     }
-    // hitbox ring
-    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(216,48,47,.35)';
-    ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); ctx.stroke();
-    for (const q of g.parts) { ctx.globalAlpha = Math.max(0, q.life * 2); ctx.fillStyle = q.col; ctx.fillRect(q.x - 2.5, q.y - 2.5, 5, 5); }
+    for (const q of g.parts) { ctx.globalAlpha = clamp(q.life * 2, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x - 2.5, q.y - 2.5, 5, 5); }
     ctx.globalAlpha = 1;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const t of g.texts) { ctx.globalAlpha = Math.min(1, t.life * 3); ctx.font = `800 ${t.size}px "M PLUS Rounded 1c", sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(t.txt, t.x, t.y); ctx.fillStyle = t.col; ctx.fillText(t.txt, t.x, t.y); }
+    for (const t of g.texts) { ctx.globalAlpha = clamp(t.life * 3, 0, 1); ctx.font = `800 ${t.size}px "M PLUS Rounded 1c", sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(t.txt, t.x, t.y); ctx.fillStyle = t.col; ctx.fillText(t.txt, t.x, t.y); }
     ctx.globalAlpha = 1;
     const vac = g.items.find(it => it.kind === 'vac');
     if (vac) edgeArrow(vac.x, vac.y, cx, cy, '#f2b33d', 'ALL');
     for (const e of g.en) if (e.elite) edgeArrow(e.x, e.y, cx, cy, '#ff5a6a');
     if (g.hint > 0 && running) {
-      ctx.globalAlpha = Math.min(1, g.hint); ctx.font = '800 15px "M PLUS Rounded 1c", sans-serif'; ctx.fillStyle = '#fff';
+      ctx.globalAlpha = clamp(g.hint, 0, 1); ctx.font = '800 15px "M PLUS Rounded 1c", sans-serif'; ctx.fillStyle = '#fff';
       ctx.fillText(`${stage.name}　${stage.sub}`, p.x, p.y + 56); ctx.globalAlpha = 1;
     }
-    if (p.poison > 0) { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = `rgba(90,170,40,${p.poison * .18})`; ctx.fillRect(0, 0, W, H); }
+    if (p.poison > 0) { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = `rgba(90,170,40,${clamp(p.poison, 0, 1) * .18})`; ctx.fillRect(0, 0, W, H); }
     if (joy.id !== null) {
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(joy.ox, joy.oy, R, 0, 7); ctx.stroke();
@@ -1066,51 +1223,66 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     requestAnimationFrame(frame);
   }
 
-  function renderStages() {
-    $('stageList').innerHTML = STAGES.map((st, i) => {
-      const lock = i + 1 > unlocked, b = store.get('cs_best_s' + (i + 1), 0);
-      return `<button class="stagebtn" type="button" id="stage${i}" data-i="${i}" ${lock ? 'disabled' : ''}>
-        <span class="sn">${st.name}　<span style="font-family:var(--font-body);font-size:13px;color:var(--ink)">${st.sub}</span></span>
-        <span class="sd">${lock ? `STAGE ${i} をクリアで解放` : st.desc}</span>
-        <span class="sb">${lock ? '' : b ? 'BEST<br>' + b.toLocaleString() : '未クリア'}</span></button>`;
-    }).join('');
+  // ---------- menus ----------
+  function renderTitle() {
+    const save = store.get('cs2_save', null), bs = store.get('cs2_best_stage', 0), bsc = store.get('cs2_best_score', 0);
+    $('contBtn').hidden = !save;
+    if (save) $('contBtn').innerHTML = `つづきから<small>STAGE ${save.stageNo} から（Lv${save.lvl}・得点 ${save.score.toLocaleString()}）</small>`;
+    $('newBtn').innerHTML = save ? 'はじめから<small>保存中の続きは消えます</small>' : 'はじめから';
+    $('newBtn').classList.toggle('primary', !save);
+    $('titleRec').innerHTML = bs || bsc ? `最高到達 <b>STAGE ${bs + 1}</b>（クリア ${bs}）　最高得点 <b>${bsc.toLocaleString()}</b>` : '';
   }
-  $('stageList').addEventListener('click', e => { const b = e.target.closest('.stagebtn'); if (b && !b.disabled) start(+b.dataset.i); });
-  function start(si) {
+  function audioOn() {
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
     if (ac && ac.state === 'suspended') ac.resume();
-    newGame(si); ['startOv', 'endOv', 'pauseOv', 'lvOv'].forEach(id => $(id).hidden = true);
-    running = true; last = performance.now();
   }
-  function toTitle() { ['endOv', 'pauseOv', 'lvOv'].forEach(id => $(id).hidden = true); running = false; renderStages(); $('startOv').hidden = false; }
+  function hideAll() { ['startOv', 'endOv', 'pauseOv', 'lvOv', 'clearOv', 'recOv'].forEach(id => $(id).hidden = true); }
+  function beginPlay() { hideAll(); running = true; last = performance.now(); }
+  function startNew() { audioOn(); store.del('cs2_save'); newRun(); beginPlay(); }
+  function startCont() { const s = store.get('cs2_save', null); if (!s) return startNew(); audioOn(); restore(s); beginPlay(); }
+  function toTitle() { hideAll(); running = false; renderTitle(); $('startOv').hidden = false; }
   function pause() {
     if (!running) return; running = false;
     const s = g.st;
     $('pauseHand').innerHTML = miniRow(g.hand);
     $('pauseHandInfo').innerHTML = g.hand.length ? partialName(g.hand) : 'まだカードなし';
-    const curKey = g.hand.length === 5 ? evalBest(g.hand) : null;
-    $('payTable').innerHTML = HAND_ORDER.filter(k => k !== 'royal').map(k => {
-      const h = HANDS[k], nm = k === 'sf' ? 'ストレートフラッシュ<br>ロイヤルフラッシュ' : h.name;
-      const c = (g.handCount[k] || 0) + (k === 'sf' ? (g.handCount.royal || 0) : 0);
-      return `<tr${curKey === k ? ' class="now"' : ''}><td>${nm}</td><td>${h.desc}</td><td class="cnt">${c ? c + '回' : ''}</td></tr>`;
-    }).join('');
-    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / s.rate).toFixed(1)}発/秒　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　引き直し ${g.rerolls}回`;
+    $('payTable').innerHTML = handTable(g.handCount, g.hand.length ? partialKey(g.hand) : null);
+    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / s.rate).toFixed(1)}発/秒　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　引き直し ${g.rerolls}回　ここまでの得点 ${g.score.toLocaleString()}`;
     $('pauseOv').hidden = false;
   }
-  $('retryBtn').onclick = () => start(+$('retryBtn').dataset.next || 0);
+  function showRecords() {
+    const hist = store.get('cs2_hist', {}), bs = store.get('cs2_best_stage', 0);
+    $('rStage').textContent = bs ? `STAGE ${bs + 1}（クリア ${bs}）` : '—';
+    $('rScore').textContent = store.get('cs2_best_score', 0).toLocaleString();
+    $('rRuns').textContent = store.get('cs2_runs', 0) + '回';
+    $('rHands').textContent = Object.values(hist).reduce((a, b) => a + b, 0) + '回';
+    $('rTable').innerHTML = handTable(hist);
+    $('startOv').hidden = true; $('recOv').hidden = false;
+  }
+  $('newBtn').onclick = startNew;
+  $('contBtn').onclick = startCont;
+  $('recBtn').onclick = showRecords;
+  $('recBack').onclick = toTitle;
+  $('retryBtn').onclick = startNew;
+  $('titleBtn').onclick = toTitle;
   $('pauseBtn').onclick = pause;
   $('resumeBtn').onclick = () => { $('pauseOv').hidden = true; if (g.pendingLv > 0) openLevelUp(); else { running = true; last = performance.now(); } };
-  $('quitBtn').onclick = toTitle;
-  $('titleBtn').onclick = toTitle;
+  $('quitBtn').onclick = () => { $('pauseOv').hidden = true; endRun(); };
+  $('nextBtn').onclick = () => { resetStage(g.stageNo + 1); beginPlay(); };
+  $('stopBtn').onclick = toTitle;
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
   // test hook for automated checks
-  window.__cs = { get g() { return g; }, start, step(dt) { if (!$('lvOv').hidden) { $('opt' + (Math.random() * 3 | 0)).click(); } else if (running) update(dt); } };
+  window.__cs = { get g() { return g; }, startNew, step(dt) {
+    if (!$('lvOv').hidden) $('opt' + (Math.random() * 3 | 0)).click();
+    else if (!$('clearOv').hidden) $('nextBtn').click();
+    else if (running && g.won) showClear();
+    else if (running) update(dt);
+  }, forceClear() { showClear(); } };
 
-  newGame(0);
-  // title backdrop
-  g.t = 60; for (let i = 0; i < 8; i++) { const e = spawnEnemy(pickType()); const a = i / 8 * 7; e.x = Math.cos(a) * 150; e.y = Math.sin(a) * 200; }
-  g.t = 0; dropXp(40, 60, 12); g.items.push({ kind: 'chest', x: -70, y: -50, t: 0 });
-  renderStages(); hud(); last = performance.now(); requestAnimationFrame(frame);
+  newRun();
+  g.t = 60; stage = stageCfg(2); for (let i = 0; i < 8; i++) { const e = spawnEnemy(pickType()); const a = i / 8 * 7; e.x = Math.cos(a) * 150; e.y = Math.sin(a) * 200; }
+  stage = stageCfg(1); g.t = 0; dropXp(40, 60, 12); g.items.push({ kind: 'chest', x: -70, y: -50, t: 0 });
+  renderTitle(); hud(); last = performance.now(); requestAnimationFrame(frame);
 })();
 </script>
