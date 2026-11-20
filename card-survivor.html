@@ -211,7 +211,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 <div class="overlay" id="clearOv" hidden>
   <div class="panel">
     <h2 id="cTitle">STAGE 1 CLEAR!</h2>
-    <p id="cSub">強さを引き継いで次のステージへ。HPが30%回復、引き直し＋1。</p>
+    <p id="cSub">強さを引き継いで次のステージへ。HPが30%回復、引き直し＋1（最大5回）。</p>
     <div class="stats">
       <div><div class="lbl">ここまでの得点</div><div class="v" id="cScore">0</div></div>
       <div><div class="lbl">レベル</div><div class="v" id="cLv">1</div></div>
@@ -321,9 +321,9 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     fh: { name: 'フルハウス', lv: 6, desc: '最大HP+25・全回復' },
     flush: { name: 'フラッシュ', lv: 5, desc: '体のまわりを回るカード+1' },
     straight: { name: 'ストレート', lv: 4, desc: '移動・弾速UP・貫通+1' },
-    three: { name: 'スリーカード', lv: 3, desc: '攻撃力+35%' },
+    three: { name: 'スリーカード', lv: 3, desc: '攻撃力+35%（足し算）' },
     two: { name: 'ツーペア', lv: 2, desc: '同時に撃つ弾+1' },
-    pair: { name: 'ワンペア', lv: 1, desc: '連射+20%（上限 8発/秒）' },
+    pair: { name: 'ワンペア', lv: 1, desc: '連射+20%（足し算・上限 8発/秒）' },
     high: { name: 'ブタ', lv: 0, desc: '攻撃力+10%・HP+10回復' },
   };
   const HAND_ORDER = ['royal', 'sf', 'four', 'fh', 'flush', 'straight', 'three', 'two', 'pair', 'high'];
@@ -399,6 +399,10 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   const BRUTE_AURA = 130;
   const CONTACT = 13;
   const RATE_CAP = 1 / 8;
+  const REROLL_MAX = 5;
+  // damage and fire-rate bonuses add up (no compounding), so growth stays linear
+  function addDmg(pct) { const s = g.st; s.dmgPct += pct; s.dmg = 13 * (1 + s.dmgPct / 100); }
+  function addRate(pct) { const s = g.st; s.ratePct += pct; s.rate = .42 / (1 + s.ratePct / 100); }
 
   // ---------- endless stages ----------
   const BOSS_AT = 150;
@@ -418,7 +422,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       return c;
     }
     Object.assign(c, {
-      hp0: Math.pow(1.9, n - 1) * .85, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(2.1, n - 1) * .75, dmgMul: Math.pow(1.22, n - 1),
+      hp0: Math.pow(1.7, n - 1) * .85, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(1.85, n - 1) * .75, dmgMul: Math.pow(1.22, n - 1),
       // bosses act faster, fire denser and quicker patterns as stages go on
       tempo: Math.min(1.6, 1 + (n - 1) * .08), dens: Math.min(2, 1 + (n - 1) * .12), bsp: Math.min(1.4, 1 + (n - 1) * .05), mspd: Math.min(1.5, 1 + (n - 1) * .04),
       xpMul: 1 + (n - 1) * .15, gemLife: Math.max(20, 40 - (n - 2) * 5), bomberR: Math.min(115, 70 + Math.max(0, n - 3) * 7),
@@ -448,7 +452,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       stageNo: 1, score: 0, kills: 0, hands: 0, graze: 0, bestLv: -1, bestKey: null, playTime: 0,
       lvl: 1, xp: 0, need: needFor(1), pendingLv: 0, rerolls: 2, choices: [], handCount: {},
       p: { x: 0, y: 0, hp: 100, maxHp: 100, inv: 0, face: 1, step: 0, vx: 0, vy: 0, poison: 0 },
-      st: { dmg: 13, rate: .42, shots: 1, pierce: 0, speed: 155, orbit: 0, nova: 0, magnet: 75, bspd: 420 },
+      st: { dmg: 13, rate: .42, dmgPct: 0, ratePct: 0, shots: 1, pierce: 0, speed: 155, orbit: 0, nova: 0, magnet: 75, bspd: 420 },
       hand: [], tipsShown: 0, over: false,
     };
     resetStage(1);
@@ -471,6 +475,8 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   function restore(s) {
     newRun();
     const { hp, maxHp, ...rest } = s;
+    if (rest.st && rest.st.dmgPct == null) { rest.st.dmgPct = (rest.st.dmg / 13 - 1) * 100; rest.st.ratePct = (.42 / rest.st.rate - 1) * 100; }
+    rest.rerolls = Math.min(REROLL_MAX, rest.rerolls);
     Object.assign(g, rest);
     g.p.hp = hp; g.p.maxHp = maxHp;
     resetStage(s.stageNo);
@@ -587,7 +593,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       return `<button class="opt" type="button" id="opt${i}" data-i="${i}" aria-label="${SYM[c.s]}${RL(c.r)}を取る">
         <div class="face" data-s="${c.s}">${cardHTML(c)}</div><span class="bonus">${SYM[c.s]} ${bonusText(c)}</span>${prev}</button>`;
     }).join('');
-    $('rerollBtn').textContent = `引き直す（残り${g.rerolls}）`;
+    $('rerollBtn').textContent = `引き直す（残り${g.rerolls}／最大${REROLL_MAX}）`;
     $('rerollBtn').disabled = g.rerolls <= 0;
     $('lvGrid').innerHTML = HAND_ORDER.filter(k => k !== 'royal').map(k =>
       `<div class="${hits.has(k) ? 'hit' : ''}"><b>${k === 'sf' ? 'ストフラ/ロイヤル' : HANDS[k].name}</b><span>${HANDS[k].desc}</span></div>`).join('');
@@ -607,24 +613,24 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   function heal(n) { const p = g.p; const before = p.hp; p.hp = Math.min(p.maxHp, p.hp + n); if (p.hp > before) floatText(p.x, p.y - 28, `+${Math.round(p.hp - before)}`, '#6ad37a', 14); }
   function suitBonus(c) {
     const s = g.st, n = suitNums(c);
-    if (c.s === 's') s.dmg *= 1 + n.atk / 100;
+    if (c.s === 's') addDmg(n.atk);
     else if (c.s === 'h') { g.p.maxHp += n.mhp; heal(n.heal); }
-    else if (c.s === 'd') s.rate *= 1 - n.rate / 100;
+    else if (c.s === 'd') addRate(n.rate);
     else if (c.s === 'c') { s.speed *= 1 + n.spd / 100; s.magnet *= 1 + n.mag / 100; }
   }
   function applyHand(key) {
     const s = g.st, p = g.p;
-    const all = () => { s.rate *= .82; s.shots++; s.dmg *= 1.35; s.speed *= 1.1; s.pierce++; s.orbit += 2; s.nova++; p.maxHp += 25; p.hp = p.maxHp; };
+    const all = () => { addRate(20); s.shots++; addDmg(35); s.speed *= 1.1; s.pierce++; s.orbit += 2; s.nova++; p.maxHp += 25; p.hp = p.maxHp; };
     switch (key) {
       case 'royal': case 'sf': all(); for (const e of g.en) if (!e.elite) killEnemy(e); g.rings.push({ x: p.x, y: p.y, r: 0, max: 700, col: '#f2b33d' }); g.ebul = []; g.shake = 12; break;
       case 'four': s.nova++; g.novaT = .3; break;
       case 'fh': p.maxHp += 25; p.hp = p.maxHp; break;
       case 'flush': s.orbit++; break;
       case 'straight': s.speed *= 1.12; s.bspd *= 1.15; s.pierce++; break;
-      case 'three': s.dmg *= 1.35; break;
+      case 'three': addDmg(35); break;
       case 'two': s.shots++; break;
-      case 'pair': s.rate *= .83; break;
-      default: s.dmg *= 1.1; heal(10);
+      case 'pair': addRate(20); break;
+      default: addDmg(10); heal(10);
     }
   }
   function addCard(card) {
@@ -918,7 +924,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
           banner('オールイン！', `チップ${n}枚を回収`); g.rings.push({ x: p.x, y: p.y, r: 0, max: 900, col: '#f2b33d' });
           [523, 784, 1047, 1568].forEach((f, i) => tone(f, .12, 'triangle', .05, i * .06)); buzz([20, 20, 60]);
         } else if (it.kind === 'heart') { heal(15); tone(660, .12, 'sine', .05); tone(990, .15, 'sine', .05, .08); }
-        else { g.rerolls++; banner('宝箱！', 'ワイルドカード＋引き直し1回'); addCard({ s: 'w', r: 0 }); [659, 784, 988, 1319].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); }
+        else { g.rerolls = Math.min(REROLL_MAX, g.rerolls + 1); banner('宝箱！', 'ワイルドカード＋引き直し1回'); addCard({ s: 'w', r: 0 }); [659, 784, 988, 1319].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); }
         return false;
       }
       return true;
@@ -975,7 +981,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     g.score += stageScore();
     const n = g.stageNo;
     // prepare the next stage now so the save is ready even if the page closes
-    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * .3); g.rerolls++;
+    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * .3); g.rerolls = Math.min(REROLL_MAX, g.rerolls + 1);
     g.stageNo = n + 1;
     const snap = snapshot(); g.stageNo = n;
     store.set('cs2_save', snap);
@@ -1257,7 +1263,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     $('pauseHand').innerHTML = miniRow(g.hand);
     $('pauseHandInfo').innerHTML = g.hand.length ? partialName(g.hand) : 'まだカードなし';
     $('payTable').innerHTML = handTable(g.handCount, g.hand.length ? partialKey(g.hand) : null);
-    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / Math.max(RATE_CAP, s.rate)).toFixed(1)}発/秒${s.rate <= RATE_CAP ? '（上限）' : ''}　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　引き直し ${g.rerolls}回　ここまでの得点 ${g.score.toLocaleString()}`;
+    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / Math.max(RATE_CAP, s.rate)).toFixed(1)}発/秒${s.rate <= RATE_CAP ? '（上限）' : ''}　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　攻撃+${Math.round(s.dmgPct)}%　連射+${Math.round(s.ratePct)}%<br>引き直し ${g.rerolls}/${REROLL_MAX}回　ここまでの得点 ${g.score.toLocaleString()}`;
     $('pauseOv').hidden = false;
   }
   function showRecords() {
