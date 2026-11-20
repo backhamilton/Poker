@@ -317,13 +317,13 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   const HANDS = {
     royal: { name: 'ロイヤルフラッシュ', lv: 9, desc: '全強化＋敵一掃！' },
     sf: { name: 'ストレートフラッシュ', lv: 8, desc: '全強化＋敵一掃！' },
-    four: { name: 'フォーカード', lv: 7, desc: '周囲に衝撃波（定期発動・重ねると強化）' },
+    four: { name: 'フォーカード', lv: 7, desc: '周囲に衝撃波（定期発動・重ねると範囲と頻度UP）' },
     fh: { name: 'フルハウス', lv: 6, desc: '最大HP+25・全回復' },
     flush: { name: 'フラッシュ', lv: 5, desc: '体のまわりを回るカード+1' },
     straight: { name: 'ストレート', lv: 4, desc: '移動・弾速UP・貫通+1' },
     three: { name: 'スリーカード', lv: 3, desc: '攻撃力+35%' },
     two: { name: 'ツーペア', lv: 2, desc: '同時に撃つ弾+1' },
-    pair: { name: 'ワンペア', lv: 1, desc: '連射+20%' },
+    pair: { name: 'ワンペア', lv: 1, desc: '連射+20%（上限 8発/秒）' },
     high: { name: 'ブタ', lv: 0, desc: '攻撃力+10%・HP+10回復' },
   };
   const HAND_ORDER = ['royal', 'sf', 'four', 'fh', 'flush', 'straight', 'three', 'two', 'pair', 'high'];
@@ -398,6 +398,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   };
   const BRUTE_AURA = 130;
   const CONTACT = 13;
+  const RATE_CAP = 1 / 8;
 
   // ---------- endless stages ----------
   const BOSS_AT = 150;
@@ -543,9 +544,9 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   // ---------- level-up draft ----------
   function makeChoices() {
     const ch = [randCard(), randCard(), randCard()];
-    // half the time one option matches a rank already in hand (never a suit: flushes stay earned)
+    // sometimes one option matches a rank already in hand (never a suit: flushes stay earned)
     const base = g.hand.filter(c => c.s !== 'w');
-    if (base.length && Math.random() < .5) {
+    if (base.length && Math.random() < .2) {
       const r = base[Math.random() * base.length | 0].r;
       ch[Math.random() * 3 | 0] = { s: SUITS[Math.random() * 4 | 0], r };
     }
@@ -800,7 +801,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       let tgt = null, bd = 400 * 400;
       for (const e of g.en) { const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2; if (d < bd) { bd = d; tgt = e; } }
       if (tgt) {
-        g.fireT = s.rate;
+        g.fireT = Math.max(RATE_CAP, s.rate);
         const base = Math.atan2(tgt.y - p.y, tgt.x - p.x), spread = .15;
         for (let i = 0; i < s.shots; i++) {
           const a = base + (i - (s.shots - 1) / 2) * spread;
@@ -828,16 +829,14 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
         if (e.dead || g.t - e.orbHit < .3) continue;
         if ((e.x - ox) ** 2 + (e.y - oy) ** 2 < (e.r + 11) ** 2) { e.orbHit = g.t; hitEnemy(e, s.dmg * 1.1, (e.x - p.x) * .05, (e.y - p.y) * .05); }
       }
-      for (const b of g.ebul) if ((b.x - ox) ** 2 + (b.y - oy) ** 2 < 14 * 14) b.life = 0;
     }
     if (s.nova > 0) {
       g.novaT -= dt;
       if (g.novaT <= 0) {
-        g.novaT = Math.max(1.4, 3.4 - s.nova * .4);
-        const rad = 130 + s.nova * 25;
+        g.novaT = Math.max(2.2, 3.6 - s.nova * .25);
+        const rad = Math.min(230, 120 + s.nova * 15);
         g.rings.push({ x: p.x, y: p.y, r: 0, max: rad, col: '#ffe08a' });
-        for (const e of g.en) { const d = Math.hypot(e.x - p.x, e.y - p.y) || 1; if (d < rad + e.r) hitEnemy(e, 25 + s.dmg * 2, (e.x - p.x) / d * 8, (e.y - p.y) / d * 8); }
-        for (const b of g.ebul) if (Math.hypot(b.x - p.x, b.y - p.y) < rad) b.life = 0;
+        for (const e of g.en) { const d = Math.hypot(e.x - p.x, e.y - p.y) || 1; if (d < rad + e.r) hitEnemy(e, 15 + s.dmg * 1.2, (e.x - p.x) / d * 4, (e.y - p.y) / d * 4); }
         tone(180, .25, 'sine', .05, 0, 90);
       }
     }
@@ -1258,7 +1257,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     $('pauseHand').innerHTML = miniRow(g.hand);
     $('pauseHandInfo').innerHTML = g.hand.length ? partialName(g.hand) : 'まだカードなし';
     $('payTable').innerHTML = handTable(g.handCount, g.hand.length ? partialKey(g.hand) : null);
-    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / s.rate).toFixed(1)}発/秒　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　引き直し ${g.rerolls}回　ここまでの得点 ${g.score.toLocaleString()}`;
+    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / Math.max(RATE_CAP, s.rate)).toFixed(1)}発/秒${s.rate <= RATE_CAP ? '（上限）' : ''}　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　引き直し ${g.rerolls}回　ここまでの得点 ${g.score.toLocaleString()}`;
     $('pauseOv').hidden = false;
   }
   function showRecords() {
@@ -1285,7 +1284,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 
   // test hook for automated checks
   window.__cs = { get g() { return g; }, startNew, step(dt) {
-    if (!$('lvOv').hidden) $('opt' + (Math.random() * 3 | 0)).click();
+    if (!$('lvOv').hidden) $('opt' + (window.__pick ? window.__pick(g, { optionResult, HANDS }) : Math.random() * 3 | 0)).click();
     else if (!$('clearOv').hidden) $('nextBtn').click();
     else if (running && g.won) showClear();
     else if (running) update(dt);
