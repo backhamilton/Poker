@@ -385,7 +385,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   const ETYPES = {
     slime:  { r: 13, hp: 14, spd: 46, col: '#7ccf6a', dmg: 12, xp: 1, ai: 'chase' },
     bat:    { r: 10, hp: 7,  spd: 92, col: '#a07ae0', dmg: 10, xp: 1, ai: 'weave' },
-    brute:  { r: 22, hp: 85, spd: 36, col: '#c4553f', dmg: 18, xp: 8, ai: 'brute' },
+    brute:  { r: 22, hp: 70, spd: 36, col: '#c4553f', dmg: 18, xp: 8, ai: 'brute' },
     archer: { r: 12, hp: 20, spd: 70, col: '#3b3f57', dmg: 10, xp: 2, ai: 'archer' },
     boar:   { r: 15, hp: 34, spd: 50, col: '#e08a3a', dmg: 12, xp: 3, ai: 'tackle' },
     bomber: { r: 11, hp: 12, spd: 88, col: '#e2483f', dmg: 0,  xp: 2, ai: 'bomber' },
@@ -422,7 +422,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       return c;
     }
     Object.assign(c, {
-      hp0: Math.pow(1.7, n - 1) * .85, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(1.85, n - 1) * .75, dmgMul: Math.pow(1.22, n - 1),
+      hp0: Math.pow(1.6, n - 1) * .8, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(1.75, n - 1) * .75, dmgMul: Math.pow(1.18, n - 1),
       // bosses act faster, fire denser and quicker patterns as stages go on
       tempo: Math.min(1.6, 1 + (n - 1) * .08), dens: Math.min(2, 1 + (n - 1) * .12), bsp: Math.min(1.4, 1 + (n - 1) * .05), mspd: Math.min(1.5, 1 + (n - 1) * .04),
       xpMul: 1 + (n - 1) * .15, gemLife: Math.max(20, 40 - (n - 2) * 5), bomberR: Math.min(115, 70 + Math.max(0, n - 3) * 7),
@@ -493,8 +493,10 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     g.en.push(e);
     return e;
   }
+  const BRUTE_MAX = 6;
   function pickType() {
-    const pool = stage.pool(g.t);
+    const brutes = g.en.reduce((n, e) => n + (e.type === 'brute' ? 1 : 0), 0);
+    const pool = stage.pool(g.t).filter(([k]) => k !== 'brute' || brutes < BRUTE_MAX);
     let tot = pool.reduce((a, b) => a + b[1], 0), r = Math.random() * tot;
     for (const [k, w] of pool) if ((r -= w) < 0) return k;
     return 'slime';
@@ -797,7 +799,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       if (!g.vacHint) { g.vacHint = true; banner('オールインチップ出現', '金の矢印の先。拾うとチップを全部回収'); }
     }
 
-    const rate = (g.finalUp ? .8 : g.t < 30 ? .9 + g.t * .03 : 1.8 + (g.t - 30) * .022) * stage.spawn;
+    const rate = (g.finalUp ? .5 : g.t < 30 ? .9 + g.t * .03 : 1.8 + (g.t - 30) * .022) * stage.spawn;
     g.spawnAcc += rate * dt;
     while (g.spawnAcc >= 1) { g.spawnAcc--; if (g.en.length < 280) spawnEnemy(pickType()); }
 
@@ -867,7 +869,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       let [vx, vy] = think(e, dt * k, dx, dy, d);
       vx *= k; vy *= k;
       if (e.dead) continue;
-      if (e.buff && e.st !== 2) { vx *= 1.4; vy *= 1.4; }
+      if (e.buff && e.st !== 2) { vx *= 1.25; vy *= 1.25; }
       e.x += (vx + e.kx * 60) * dt; e.y += (vy + e.ky * 60) * dt;
       e.kx *= .85; e.ky *= .85; e.flash -= dt; e.wob += dt * 6;
       if (e.dmg && d < e.r + CONTACT) hurt(e.dmg, e.type);
