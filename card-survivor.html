@@ -142,6 +142,32 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 .handgrid span { color: var(--muted); }
 .handgrid .hit { background: rgba(242,179,61,.18); }
 .lvhand { display: flex; justify-content: center; gap: 6px; }
+/* save slots & skill shop */
+.slotlist { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slotbtn { appearance: none; font: inherit; color: var(--ink); cursor: pointer; text-align: left; border: 2px solid rgba(255,255,255,.16); background: rgba(255,255,255,.05); border-radius: 12px; padding: 8px 9px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.slotbtn[aria-pressed="true"] { border-color: var(--gold); background: rgba(242,179,61,.12); }
+.slotbtn .sn { font-family: var(--font-display); font-size: 13px; color: var(--gold); }
+.slotbtn .sl { font-size: 11px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.slotbtn .sl b { color: var(--ink); }
+.slotbtn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.menu { display: grid; gap: 8px; }
+.btn.danger { border-color: rgba(255,90,106,.45); color: #ffb3ba; background: transparent; font-size: 13px; padding: 9px; }
+.bank { font-family: var(--font-display); font-size: 26px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.shoplist { display: grid; gap: 8px; text-align: left; }
+.shoprow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px 12px; }
+.shoprow .nm { font-weight: 800; font-size: 14px; grid-column: 1; }
+.shoprow .nm small { font-family: var(--font-display); font-size: 11px; color: var(--xp); margin-left: 6px; }
+.shoprow .ds { grid-column: 1; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.shoprow .ds b { color: var(--ink); }
+.shoprow .buy { grid-column: 2; grid-row: 1 / span 2; appearance: none; border: 0; border-radius: 10px; background: var(--gold); color: #1a1a1a; font: 800 13px var(--font-body); padding: 9px 10px; cursor: pointer; min-width: 92px; font-variant-numeric: tabular-nums; }
+.shoprow .buy small { display: block; font-size: 10.5px; font-weight: 500; }
+.shoprow .buy:disabled { background: rgba(255,255,255,.1); color: var(--muted); cursor: default; }
+.shoprow .buy:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.pips { display: flex; gap: 3px; grid-column: 1; }
+.pips i { width: 10px; height: 5px; border-radius: 2px; background: rgba(255,255,255,.15); }
+.pips i.on { background: var(--xp); }
+.gain { font-size: 13px; font-weight: 800; color: var(--muted); }
+.gain b { color: var(--gold); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 </style>
 
@@ -168,15 +194,22 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   <div class="panel">
     <h1>CARD SURVIVOR<small>トランプ・サバイバー</small></h1>
     <div class="steps">
-      <div><b>ドラッグで移動</b>。攻撃は自動。</div>
-      <div>敵が落とす<b>チップ</b>でレベルアップ。<b>3枚から1枚</b>選んで手札へ。5枚そろうと<b>役に応じて強化</b>。</div>
-      <div>カードは<b>数字が大きいほど効果も大きい</b>（Aが最大）。</div>
-      <div>2分30秒でステージボス。倒すと強さを<b>引き継いで次のステージ</b>へ。ステージは無限。どこまで行けるか挑戦。</div>
+      <div><b>ドラッグで移動</b>。攻撃は自動。敵が落とす<b>チップ</b>でレベルアップし、<b>3枚から1枚</b>選んで手札へ。5枚そろうと<b>役に応じて強化</b>。</div>
+      <div>2分30秒でボス。倒すと強さを<b>引き継いで次のステージ</b>へ。ステージは無限。</div>
+      <div>稼いだ得点は<b>スキルショップ</b>で永久強化に使える。強くなって、もっと先のステージへ。</div>
     </div>
+    <div class="sectionlbl">セーブスロット</div>
+    <div class="slotlist" id="slotList"></div>
     <div class="recline" id="titleRec"></div>
-    <button class="btn primary" id="contBtn" type="button" hidden>つづきから</button>
-    <button class="btn primary" id="newBtn" type="button">はじめから</button>
-    <button class="btn" id="recBtn" type="button">これまでの記録</button>
+    <div class="menu">
+      <button class="btn primary" id="contBtn" type="button" hidden>つづきから</button>
+      <button class="btn primary" id="newBtn" type="button">はじめから</button>
+      <div class="row">
+        <button class="btn" id="shopBtn" type="button">スキルショップ</button>
+        <button class="btn" id="recBtn" type="button">これまでの記録</button>
+      </div>
+      <button class="btn danger" id="wipeBtn" type="button">このスロットのデータを消す</button>
+    </div>
   </div>
 </div>
 
@@ -218,6 +251,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       <div><div class="lbl">HP</div><div class="v" id="cHp">0</div></div>
       <div><div class="lbl">発動した役</div><div class="v" id="cHands">0</div></div>
     </div>
+    <p class="gain" id="cGain"></p>
     <p id="cNext" style="font-size:13px;color:var(--muted)"></p>
     <button class="btn primary" id="nextBtn" type="button">次のステージへ</button>
     <button class="btn" id="stopBtn" type="button">ここでやめる<small>進み具合は保存済み。あとで「つづきから」で再開できます</small></button>
@@ -230,6 +264,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     <div class="recline" id="eStage"></div>
     <div class="big" id="eScore">0</div>
     <div style="color:var(--gold);font-weight:800" id="eBest" hidden>自己ベスト更新！</div>
+    <p class="gain" id="eGain"></p>
     <div class="stats">
       <div><div class="lbl">プレイ時間</div><div class="v" id="eTime">0</div></div>
       <div><div class="lbl">撃破数</div><div class="v" id="eKill">0</div></div>
@@ -238,6 +273,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     </div>
     <div class="sectionlbl">今回作った役</div>
     <table class="pay" id="eTable"></table>
+    <button class="btn" id="eShopBtn" type="button">スキルショップで強化する</button>
     <div class="row">
       <button class="btn" id="titleBtn" type="button">タイトル</button>
       <button class="btn primary" id="retryBtn" type="button">もう一回</button>
@@ -245,9 +281,20 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   </div>
 </div>
 
+<div class="overlay" id="shopOv" hidden>
+  <div class="panel">
+    <h2 id="shopTitle">スキルショップ</h2>
+    <div><div class="lbl">所持スコア</div><div class="bank" id="shopBank">0</div></div>
+    <p style="font-size:12.5px;color:var(--muted)">買った強化はこのスロットにずっと残ります。次に「はじめから」で始めたランから効きます。</p>
+    <div class="shoplist" id="shopList"></div>
+    <button class="btn primary" id="shopBack" type="button">もどる</button>
+    <button class="btn danger" id="refundBtn" type="button">強化をすべて外して全額戻す</button>
+  </div>
+</div>
+
 <div class="overlay" id="recOv" hidden>
   <div class="panel">
-    <h2>これまでの記録</h2>
+    <h2 id="recTitle">これまでの記録</h2>
     <div class="stats">
       <div><div class="lbl">最高到達ステージ</div><div class="v" id="rStage">—</div></div>
       <div><div class="lbl">最高得点</div><div class="v" id="rScore">—</div></div>
@@ -278,6 +325,22 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   addEventListener('resize', resize); resize();
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- save slots (each keeps its own bank, skills, records and run save) ----------
+  const SLOT_N = 3;
+  const slotKey = i => 'cs3_slot' + (i + 1);
+  const emptySlot = () => ({ used: false, bank: 0, earned: 0, up: {}, bestStage: 0, bestScore: 0, runs: 0, hist: {}, save: null });
+  function readSlot(i) { return Object.assign(emptySlot(), store.get(slotKey(i), {})); }
+  // first launch of this version: move the old single save into slot 1
+  if (!store.get(slotKey(0), null) && (store.get('cs2_runs', 0) || store.get('cs2_save', null) || store.get('cs2_best_stage', 0))) {
+    store.set(slotKey(0), Object.assign(emptySlot(), { used: true, bestStage: store.get('cs2_best_stage', 0), bestScore: store.get('cs2_best_score', 0),
+      runs: store.get('cs2_runs', 0), hist: store.get('cs2_hist', {}), save: store.get('cs2_save', null) }));
+  }
+  let slotIdx = clamp(store.get('cs3_last', 0) | 0, 0, SLOT_N - 1);
+  let sd = readSlot(slotIdx);
+  function saveSlot() { sd.used = true; store.set(slotKey(slotIdx), sd); }
+  function selectSlot(i) { slotIdx = i; store.set('cs3_last', i); sd = readSlot(i); }
+  const short = n => n >= 1e8 ? (n / 1e8).toFixed(1) + '億' : n >= 1e4 ? (n / 1e4).toFixed(1) + '万' : n.toLocaleString();
 
   // ---------- sound ----------
   let ac = null, lastSnd = {};
@@ -404,6 +467,24 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   function addDmg(pct) { const s = g.st; s.dmgPct += pct; s.dmg = 13 * (1 + s.dmgPct / 100); }
   function addRate(pct) { const s = g.st; s.ratePct += pct; s.rate = .42 / (1 + s.ratePct / 100); }
 
+  // ---------- permanent skills (bought with banked score, kept per slot) ----------
+  const UPGRADES = [
+    { id: 'atk', name: '攻撃力', max: 10, base: 3000, fx: l => `攻撃+${5 * l}%` },
+    { id: 'hp', name: '最大HP', max: 10, base: 3000, fx: l => `最大HP+${10 * l}` },
+    { id: 'rate', name: '連射', max: 10, base: 3000, fx: l => `連射+${5 * l}%` },
+    { id: 'armor', name: '守り', max: 5, base: 5000, fx: l => `受けるダメージ-${4 * l}%` },
+    { id: 'xp', name: '経験値', max: 10, base: 4000, fx: l => `経験値+${5 * l}%` },
+    { id: 'speed', name: '足の速さ', max: 5, base: 2500, fx: l => `移動+${3 * l}%` },
+    { id: 'magnet', name: '吸い寄せ', max: 5, base: 2000, fx: l => `吸い寄せ範囲+${12 * l}%` },
+    { id: 'reroll', name: '引き直し', max: 3, base: 8000, fx: l => `開始時と上限+${l}回` },
+    { id: 'heal', name: '休憩', max: 3, base: 6000, fx: l => `ステージ間の回復 ${50 + 10 * l}%` },
+    { id: 'wild', name: '切り札', max: 1, base: 40000, fx: () => '★ワイルドを1枚持って始める' },
+    { id: 'revive', name: '復活', max: 1, base: 80000, fx: () => '1ランに1回、HP50%で復活' },
+  ];
+  const upLv = id => (sd.up && sd.up[id]) || 0;
+  const upCost = (u, lv) => Math.round(u.base * Math.pow(lv + 1, 1.5) / 100) * 100;
+  function totalSpent() { return UPGRADES.reduce((a, u) => { let t = 0; for (let k = 0; k < upLv(u.id); k++) t += upCost(u, k); return a + t; }, 0); }
+
   // ---------- endless stages ----------
   const BOSS_AT = 150;
   const THEMES = [
@@ -425,6 +506,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     const avail = ENEMY_ORDER.slice(0, Math.min(n, ENEMY_ORDER.length));
     c.avail = avail; c.newType = n <= ENEMY_ORDER.length ? ENEMY_ORDER[n - 1] : null;
     c.has = k => avail.includes(k);
+    c.archerSlow = n <= 5 ? 1.5 : n <= 7 ? 1.25 : 1; // archers shoot less often in their first stages
     c.pool = t => avail.map(k => {
       // the newest type ramps in over the first 20s so it is noticed, then appears a bit more often than the rest
       let w = BASE_W[k];
@@ -470,6 +552,14 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       st: { dmg: 13, rate: .42, dmgPct: 0, ratePct: 0, shots: 1, pierce: 0, speed: 155, orbit: 0, nova: 0, magnet: 75, bspd: 420 },
       hand: [], tipsShown: 0, over: false,
     };
+    // permanent skills from the shop
+    const L = upLv;
+    Object.assign(g, { xpMul: 1 + .05 * L('xp'), armor: .04 * L('armor'), healBetween: .5 + .1 * L('heal'), revives: L('revive'), rerollMax: REROLL_MAX + L('reroll') });
+    g.rerolls = 2 + L('reroll');
+    g.p.maxHp = g.p.hp = 100 + 10 * L('hp');
+    g.st.speed *= 1 + .03 * L('speed'); g.st.magnet *= 1 + .12 * L('magnet');
+    addDmg(5 * L('atk')); addRate(5 * L('rate'));
+    if (L('wild')) g.hand = [{ s: 'w', r: 0 }];
     resetStage(1);
   }
   // stage-local state; the build (stats, level, hand, HP) carries over
@@ -485,13 +575,14 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   }
   function snapshot() {
     return { stageNo: g.stageNo, score: g.score, kills: g.kills, hands: g.hands, graze: g.graze, bestLv: g.bestLv, bestKey: g.bestKey, playTime: g.playTime,
-      lvl: g.lvl, xp: g.xp, need: g.need, rerolls: g.rerolls, handCount: g.handCount, hand: g.hand, st: g.st, hp: g.p.hp, maxHp: g.p.maxHp, tipsShown: g.tipsShown };
+      lvl: g.lvl, xp: g.xp, need: g.need, rerolls: g.rerolls, handCount: g.handCount, hand: g.hand, st: g.st, hp: g.p.hp, maxHp: g.p.maxHp, tipsShown: g.tipsShown,
+      xpMul: g.xpMul, armor: g.armor, healBetween: g.healBetween, revives: g.revives, rerollMax: g.rerollMax };
   }
   function restore(s) {
     newRun();
     const { hp, maxHp, ...rest } = s;
     if (rest.st && rest.st.dmgPct == null) { rest.st.dmgPct = (rest.st.dmg / 13 - 1) * 100; rest.st.ratePct = (.42 / rest.st.rate - 1) * 100; }
-    rest.rerolls = Math.min(REROLL_MAX, rest.rerolls);
+    rest.rerolls = Math.min(rest.rerollMax || g.rerollMax, rest.rerolls);
     Object.assign(g, rest);
     g.p.hp = hp; g.p.maxHp = maxHp;
     resetStage(s.stageNo);
@@ -508,10 +599,11 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     g.en.push(e);
     return e;
   }
-  const BRUTE_MAX = 6;
+  // how many of a type may be on the field at once: archers start rare (2 on stage 4) and grow by 1 per stage
+  const TYPE_CAP = { brute: () => 6, archer: n => Math.min(8, 1 + Math.max(0, n - 3)) };
   function pickType() {
-    const brutes = g.en.reduce((n, e) => n + (e.type === 'brute' ? 1 : 0), 0);
-    const pool = stage.pool(g.t).filter(([k]) => k !== 'brute' || brutes < BRUTE_MAX);
+    const cnt = {}; for (const e of g.en) cnt[e.type] = (cnt[e.type] || 0) + 1;
+    const pool = stage.pool(g.t).filter(([k]) => !TYPE_CAP[k] || (cnt[k] || 0) < TYPE_CAP[k](stage.n));
     let tot = pool.reduce((a, b) => a + b[1], 0), r = Math.random() * tot;
     for (const [k, w] of pool) if ((r -= w) < 0) return k;
     return 'slime';
@@ -559,7 +651,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     if (g.gems.length > 350) { const old = g.gems.shift(); g.gems[g.gems.length - 1].v += old.v; }
   }
   function gainXp(v) {
-    g.xp += v;
+    g.xp += v * (g.xpMul || 1);
     while (g.xp >= g.need) { g.xp -= g.need; g.lvl++; g.need = needFor(g.lvl); g.pendingLv++; }
     if (g.pendingLv > 0 && running) openLevelUp();
   }
@@ -610,7 +702,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       return `<button class="opt" type="button" id="opt${i}" data-i="${i}" aria-label="${SYM[c.s]}${RL(c.r)}を取る">
         <div class="face" data-s="${c.s}">${cardHTML(c)}</div><span class="bonus">${SYM[c.s]} ${bonusText(c)}</span>${prev}</button>`;
     }).join('');
-    $('rerollBtn').textContent = `引き直す（残り${g.rerolls}／最大${REROLL_MAX}）`;
+    $('rerollBtn').textContent = `引き直す（残り${g.rerolls}／最大${g.rerollMax}）`;
     $('rerollBtn').disabled = g.rerolls <= 0;
     $('lvGrid').innerHTML = HAND_ORDER.filter(k => k !== 'royal').map(k =>
       `<div class="${hits.has(k) ? 'hit' : ''}"><b>${k === 'sf' ? 'ストフラ/ロイヤル' : HANDS[k].name}</b><span>${HANDS[k].desc}</span></div>`).join('');
@@ -655,7 +747,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     if (g.hand.length === 5) {
       const key = evalBest(g.hand), h = HANDS[key];
       g.hands++; g.handCount[key] = (g.handCount[key] || 0) + 1;
-      const hist = store.get('cs2_hist', {}); hist[key] = (hist[key] || 0) + 1; store.set('cs2_hist', hist);
+      sd.hist[key] = (sd.hist[key] || 0) + 1; saveSlot();
       if (h.lv > g.bestLv) { g.bestLv = h.lv; g.bestKey = key; }
       applyHand(key);
       banner(h.name, h.desc);
@@ -700,7 +792,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
         if (d > 270) { vx = ux * e.spd; vy = uy * e.spd; }
         else if (d < 200) { vx = -ux * e.spd; vy = -uy * e.spd; }
         else { vx = -uy * e.spd * .6 * e.side; vy = ux * e.spd * .6 * e.side; }
-        if (e.stT <= 0 && d < 380) { fireAt(e.x, e.y, 140, 1, 0, '#c9d4ff'); e.stT = rand(2.8, 3.8); }
+        if (e.stT <= 0 && d < 380) { fireAt(e.x, e.y, 140, 1, 0, '#c9d4ff'); e.stT = rand(2.8, 3.8) * stage.archerSlow; }
         return [vx, vy];
       }
       case 'tackle': {
@@ -903,9 +995,9 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     g.pools = g.pools.filter(pl => pl.life > 0);
     p.poison = inPool ? Math.min(1, p.poison + dt * 4) : Math.max(0, p.poison - dt * 3);
     if (inPool && !g.won) {
-      p.hp -= 16 * stage.dmgMul * dt;
+      p.hp -= 16 * stage.dmgMul * (1 - (g.armor || 0)) * dt;
       sfx('poison', 400, () => { floatText(p.x, p.y - 26, '毒', '#9be15a', 13); tone(220, .08, 'sine', .03, 0, 160); });
-      if (p.hp <= 0) endRun();
+      if (p.hp <= 0) playerDown();
     }
 
     for (const b of g.ebul) {
@@ -942,7 +1034,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
           banner('オールイン！', `チップ${n}枚を回収`); g.rings.push({ x: p.x, y: p.y, r: 0, max: 900, col: '#f2b33d' });
           [523, 784, 1047, 1568].forEach((f, i) => tone(f, .12, 'triangle', .05, i * .06)); buzz([20, 20, 60]);
         } else if (it.kind === 'heart') { heal(15); tone(660, .12, 'sine', .05); tone(990, .15, 'sine', .05, .08); }
-        else { g.rerolls = Math.min(REROLL_MAX, g.rerolls + 1); banner('宝箱！', 'ワイルドカード＋引き直し1回'); addCard({ s: 'w', r: 0 }); [659, 784, 988, 1319].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); }
+        else { g.rerolls = Math.min(g.rerollMax, g.rerolls + 1); banner('宝箱！', 'ワイルドカード＋引き直し1回'); addCard({ s: 'w', r: 0 }); [659, 784, 988, 1319].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); }
         return false;
       }
       return true;
@@ -960,12 +1052,27 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   function hurt(dmg, src = '?') {
     const p = g.p;
     if (p.inv > 0 || g.over || g.won) return;
+    dmg = Math.max(1, Math.round(dmg * (1 - (g.armor || 0))));
     g.dmgLog = g.dmgLog || {}; g.dmgLog[src] = (g.dmgLog[src] || 0) + dmg;
     p.hp -= dmg; p.inv = 1.1; g.shake = 7; buzz(70); tone(140, .2, 'sawtooth', .06);
     floatText(p.x, p.y - 26, `-${dmg}`, '#ff5a6a', 16);
     for (const q of g.en) { if (q.elite) continue; const qd = Math.hypot(q.x - p.x, q.y - p.y) || 1; if (qd < 110) { q.kx += (q.x - p.x) / qd * 7; q.ky += (q.y - p.y) / qd * 7; } }
     for (const b of g.ebul) if (Math.hypot(b.x - p.x, b.y - p.y) < 70) b.life = 0;
-    if (p.hp <= 0) endRun();
+    if (p.hp <= 0) playerDown();
+  }
+  // HP hit zero: use the shop's revive if there is one left, otherwise the run ends
+  function playerDown() {
+    const p = g.p;
+    if (g.revives > 0) {
+      g.revives--; p.hp = p.maxHp * .5; p.inv = 2.5; g.shake = 10;
+      g.ebul = g.ebul.filter(b => Math.hypot(b.x - p.x, b.y - p.y) > 320);
+      for (const q of g.en) { if (q.elite) continue; const qd = Math.hypot(q.x - p.x, q.y - p.y) || 1; if (qd < 220) { q.kx += (q.x - p.x) / qd * 14; q.ky += (q.y - p.y) / qd * 14; } }
+      g.rings.push({ x: p.x, y: p.y, r: 0, max: 320, col: '#6ad37a' });
+      banner('復活！', 'HP50%で立ち上がった');
+      [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, .15, 'triangle', .05, i * .07)); buzz([40, 30, 40, 30, 120]);
+      return;
+    }
+    endRun();
   }
 
   function separate() {
@@ -996,14 +1103,17 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   function showClear() {
     if (g.cleared || g.over) return;
     g.cleared = true; running = false;
-    g.score += stageScore();
+    const gained = stageScore();
+    g.score += gained; sd.bank += gained; sd.earned += gained;
     const n = g.stageNo;
     // prepare the next stage now so the save is ready even if the page closes
-    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * .5); g.rerolls = Math.min(REROLL_MAX, g.rerolls + 1);
+    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * g.healBetween); g.rerolls = Math.min(g.rerollMax, g.rerolls + 1);
     g.stageNo = n + 1;
-    const snap = snapshot(); g.stageNo = n;
-    store.set('cs2_save', snap);
+    sd.save = snapshot(); g.stageNo = n;
     recordBest(n);
+    saveSlot();
+    $('cSub').textContent = `強さを引き継いで次のステージへ。HPが${Math.round(g.healBetween * 100)}%回復、引き直し＋1（最大${g.rerollMax}回）。`;
+    $('cGain').innerHTML = `スコア <b>+${gained.toLocaleString()}</b> を貯金（所持 ${sd.bank.toLocaleString()}）`;
     $('cTitle').textContent = `STAGE ${n} CLEAR!`;
     $('cScore').textContent = g.score.toLocaleString(); $('cLv').textContent = g.lvl;
     $('cHp').textContent = `${Math.ceil(g.p.hp)} / ${g.p.maxHp}`; $('cHands').textContent = g.hands + '回';
@@ -1013,18 +1123,19 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     $('clearOv').hidden = false;
   }
   function recordBest(stageReached) {
-    const bs = store.get('cs2_best_stage', 0);
-    if (stageReached > bs) store.set('cs2_best_stage', stageReached);
+    if (stageReached > sd.bestStage) sd.bestStage = stageReached;
   }
   function endRun() {
     if (g.over) return;
     running = false; g.over = true;
-    g.score += g.stageKills * 10 + Math.floor(g.t) * 5 + g.graze * 2;
-    store.del('cs2_save');
-    store.set('cs2_runs', store.get('cs2_runs', 0) + 1);
+    const gained = g.stageKills * 10 + Math.floor(g.t) * 5 + g.graze * 2;
+    g.score += gained; sd.bank += gained; sd.earned += gained;
+    sd.save = null; sd.runs++;
     recordBest(g.stageNo - 1);
-    const prevBest = store.get('cs2_best_score', 0), isBest = g.score > prevBest;
-    if (isBest) store.set('cs2_best_score', g.score);
+    const isBest = g.score > sd.bestScore;
+    if (isBest) sd.bestScore = g.score;
+    saveSlot();
+    $('eGain').innerHTML = `このランの得点はすべて貯金済み（所持 <b>${sd.bank.toLocaleString()}</b>）`;
     $('eTitle').textContent = 'GAME OVER';
     $('eStage').innerHTML = `<b>STAGE ${g.stageNo}</b> で力尽きた（クリア ${g.stageNo - 1} ステージ）`;
     $('eScore').textContent = g.score.toLocaleString(); $('eBest').hidden = !isBest;
@@ -1259,21 +1370,29 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 
   // ---------- menus ----------
   function renderTitle() {
-    const save = store.get('cs2_save', null), bs = store.get('cs2_best_stage', 0), bsc = store.get('cs2_best_score', 0);
+    $('slotList').innerHTML = Array.from({ length: SLOT_N }, (_, i) => {
+      const d = i === slotIdx ? sd : readSlot(i);
+      const body = d.used ? `最高 <b>STAGE ${d.bestStage + 1}</b><br>所持 <b>${short(d.bank)}</b>${d.save ? `<br>続き STAGE ${d.save.stageNo}` : ''}` : '空き';
+      return `<button class="slotbtn" type="button" id="slot${i}" data-i="${i}" aria-pressed="${i === slotIdx}"><span class="sn">SLOT ${i + 1}</span><span class="sl">${body}</span></button>`;
+    }).join('');
+    const save = sd.save;
     $('contBtn').hidden = !save;
     if (save) $('contBtn').innerHTML = `つづきから<small>STAGE ${save.stageNo} から（Lv${save.lvl}・得点 ${save.score.toLocaleString()}）</small>`;
-    $('newBtn').innerHTML = save ? 'はじめから<small>保存中の続きは消えます</small>' : 'はじめから';
+    $('newBtn').innerHTML = save ? 'はじめから<small>保存中の続きは消えます（得点は貯金済み）</small>' : 'はじめから';
     $('newBtn').classList.toggle('primary', !save);
-    $('titleRec').innerHTML = bs || bsc ? `最高到達 <b>STAGE ${bs + 1}</b>（クリア ${bs}）　最高得点 <b>${bsc.toLocaleString()}</b>` : '';
+    $('shopBtn').innerHTML = `スキルショップ<small>所持 ${short(sd.bank)}</small>`;
+    $('titleRec').innerHTML = sd.used ? `SLOT ${slotIdx + 1}：最高到達 <b>STAGE ${sd.bestStage + 1}</b>（クリア ${sd.bestStage}）` : `SLOT ${slotIdx + 1} はまだ遊んでいないスロットです`;
+    $('wipeBtn').hidden = !sd.used; $('wipeBtn').textContent = 'このスロットのデータを消す'; wipeArm = 0;
   }
+  let wipeArm = 0, refundArm = 0, shopReturn = 'title';
   function audioOn() {
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
     if (ac && ac.state === 'suspended') ac.resume();
   }
-  function hideAll() { ['startOv', 'endOv', 'pauseOv', 'lvOv', 'clearOv', 'recOv'].forEach(id => $(id).hidden = true); }
+  function hideAll() { ['startOv', 'endOv', 'pauseOv', 'lvOv', 'clearOv', 'recOv', 'shopOv'].forEach(id => $(id).hidden = true); }
   function beginPlay() { hideAll(); running = true; last = performance.now(); }
-  function startNew() { audioOn(); store.del('cs2_save'); newRun(); beginPlay(); }
-  function startCont() { const s = store.get('cs2_save', null); if (!s) return startNew(); audioOn(); restore(s); beginPlay(); }
+  function startNew() { audioOn(); sd.save = null; saveSlot(); newRun(); beginPlay(); }
+  function startCont() { const s = sd.save; if (!s) return startNew(); audioOn(); restore(s); beginPlay(); }
   function toTitle() { hideAll(); running = false; renderTitle(); $('startOv').hidden = false; }
   function pause() {
     if (!running) return; running = false;
@@ -1281,18 +1400,62 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     $('pauseHand').innerHTML = miniRow(g.hand);
     $('pauseHandInfo').innerHTML = g.hand.length ? partialName(g.hand) : 'まだカードなし';
     $('payTable').innerHTML = handTable(g.handCount, g.hand.length ? partialKey(g.hand) : null);
-    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / Math.max(RATE_CAP, s.rate)).toFixed(1)}発/秒${s.rate <= RATE_CAP ? '（上限）' : ''}　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　攻撃+${Math.round(s.dmgPct)}%　連射+${Math.round(s.ratePct)}%<br>引き直し ${g.rerolls}/${REROLL_MAX}回　ここまでの得点 ${g.score.toLocaleString()}`;
+    $('buildList').innerHTML = `Lv${g.lvl}　攻撃力 ${Math.round(s.dmg)}　連射 ${(1 / Math.max(RATE_CAP, s.rate)).toFixed(1)}発/秒${s.rate <= RATE_CAP ? '（上限）' : ''}　弾数 ${s.shots}<br>貫通 ${s.pierce}　回るカード ${s.orbit}　衝撃波Lv ${s.nova}　移動 ${Math.round(s.speed)}<br>最大HP ${g.p.maxHp}　攻撃+${Math.round(s.dmgPct)}%　連射+${Math.round(s.ratePct)}%<br>引き直し ${g.rerolls}/${g.rerollMax}回　守り -${Math.round((g.armor || 0) * 100)}%　復活 残り${g.revives || 0}回<br>ここまでの得点 ${g.score.toLocaleString()}`;
     $('pauseOv').hidden = false;
   }
   function showRecords() {
-    const hist = store.get('cs2_hist', {}), bs = store.get('cs2_best_stage', 0);
+    const hist = sd.hist, bs = sd.bestStage;
+    $('recTitle').textContent = `これまでの記録（SLOT ${slotIdx + 1}）`;
     $('rStage').textContent = bs ? `STAGE ${bs + 1}（クリア ${bs}）` : '—';
-    $('rScore').textContent = store.get('cs2_best_score', 0).toLocaleString();
-    $('rRuns').textContent = store.get('cs2_runs', 0) + '回';
+    $('rScore').textContent = sd.bestScore.toLocaleString();
+    $('rRuns').textContent = sd.runs + '回';
     $('rHands').textContent = Object.values(hist).reduce((a, b) => a + b, 0) + '回';
     $('rTable').innerHTML = handTable(hist);
     $('startOv').hidden = true; $('recOv').hidden = false;
   }
+  // ---------- skill shop ----------
+  function renderShop() {
+    $('shopTitle').textContent = `スキルショップ（SLOT ${slotIdx + 1}）`;
+    $('shopBank').textContent = sd.bank.toLocaleString();
+    $('shopList').innerHTML = UPGRADES.map(u => {
+      const lv = upLv(u.id), maxed = lv >= u.max, cost = maxed ? 0 : upCost(u, lv);
+      const pips = u.max > 1 ? `<div class="pips">${Array.from({ length: u.max }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('')}</div>` : '';
+      return `<div class="shoprow"><div class="nm">${u.name}<small>Lv ${lv}/${u.max}</small></div>
+        <button class="buy" type="button" id="buy-${u.id}" data-id="${u.id}" ${maxed || sd.bank < cost ? 'disabled' : ''}>${maxed ? 'MAX' : cost.toLocaleString()}<small>${maxed ? '強化済み' : 'で強化'}</small></button>
+        <div class="ds">いま：<b>${lv ? u.fx(lv) : 'なし'}</b>${maxed ? '' : `<br>次：${u.fx(lv + 1)}`}</div>${pips}</div>`;
+    }).join('');
+    const spent = totalSpent();
+    $('refundBtn').hidden = spent <= 0;
+    $('refundBtn').textContent = `強化をすべて外して全額戻す（${spent.toLocaleString()}）`; refundArm = 0;
+  }
+  function openShop(from) { shopReturn = from; hideAll(); renderShop(); $('shopOv').hidden = false; }
+  $('shopList').addEventListener('click', e => {
+    const b = e.target.closest('.buy'); if (!b || b.disabled) return;
+    const u = UPGRADES.find(x => x.id === b.dataset.id), lv = upLv(u.id); if (lv >= u.max) return;
+    const cost = upCost(u, lv); if (sd.bank < cost) return;
+    sd.bank -= cost; sd.up = Object.assign({}, sd.up, { [u.id]: lv + 1 }); saveSlot();
+    audioOn(); [659, 880, 1175].forEach((f, i) => tone(f, .1, 'triangle', .05, i * .06));
+    renderShop();
+  });
+  $('refundBtn').onclick = () => {
+    if (Date.now() - refundArm < 4000) { sd.bank += totalSpent(); sd.up = {}; saveSlot(); renderShop(); return; }
+    refundArm = Date.now(); $('refundBtn').textContent = 'もう一度タップで全部外す（スコアは全額戻ります）';
+  };
+  $('shopBack').onclick = () => {
+    $('shopOv').hidden = true;
+    if (shopReturn === 'end') { $('eGain').innerHTML = `このランの得点はすべて貯金済み（所持 <b>${sd.bank.toLocaleString()}</b>）`; $('endOv').hidden = false; }
+    else toTitle();
+  };
+  $('shopBtn').onclick = () => openShop('title');
+  $('eShopBtn').onclick = () => openShop('end');
+  $('slotList').addEventListener('click', e => { const b = e.target.closest('.slotbtn'); if (!b) return; selectSlot(+b.dataset.i); renderTitle(); });
+  $('wipeBtn').onclick = () => {
+    if (Date.now() - wipeArm < 4000) {
+      store.del(slotKey(slotIdx)); sd = readSlot(slotIdx); renderTitle();
+      $('titleRec').textContent = `SLOT ${slotIdx + 1} のデータを消しました`; return;
+    }
+    wipeArm = Date.now(); $('wipeBtn').textContent = 'もう一度タップで消す（元に戻せません）';
+  };
   $('newBtn').onclick = startNew;
   $('contBtn').onclick = startCont;
   $('recBtn').onclick = showRecords;
@@ -1307,7 +1470,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
   // test hook for automated checks
-  window.__cs = { get g() { return g; }, startNew, step(dt) {
+  window.__cs = { get g() { return g; }, get sd() { return sd; }, setUp(o) { sd.up = o; }, startNew, step(dt) {
     if (!$('lvOv').hidden) $('opt' + (window.__pick ? window.__pick(g, { optionResult, HANDS }) : Math.random() * 3 | 0)).click();
     else if (!$('clearOv').hidden) $('nextBtn').click();
     else if (running && g.won) showClear();
