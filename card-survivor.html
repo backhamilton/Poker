@@ -211,7 +211,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
 <div class="overlay" id="clearOv" hidden>
   <div class="panel">
     <h2 id="cTitle">STAGE 1 CLEAR!</h2>
-    <p id="cSub">強さを引き継いで次のステージへ。HPが30%回復、引き直し＋1（最大5回）。</p>
+    <p id="cSub">強さを引き継いで次のステージへ。HPが50%回復、引き直し＋1（最大5回）。</p>
     <div class="stats">
       <div><div class="lbl">ここまでの得点</div><div class="v" id="cScore">0</div></div>
       <div><div class="lbl">レベル</div><div class="v" id="cLv">1</div></div>
@@ -387,7 +387,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     bat:    { r: 10, hp: 7,  spd: 92, col: '#a07ae0', dmg: 10, xp: 1, ai: 'weave' },
     brute:  { r: 22, hp: 70, spd: 36, col: '#c4553f', dmg: 18, xp: 8, ai: 'brute' },
     archer: { r: 12, hp: 20, spd: 70, col: '#3b3f57', dmg: 10, xp: 2, ai: 'archer' },
-    boar:   { r: 15, hp: 34, spd: 50, col: '#e08a3a', dmg: 12, xp: 3, ai: 'tackle' },
+    boar:   { r: 15, hp: 34, spd: 50, col: '#e08a3a', dmg: 10, xp: 3, ai: 'tackle' },
     bomber: { r: 11, hp: 12, spd: 88, col: '#e2483f', dmg: 0,  xp: 2, ai: 'bomber' },
     ghost:  { r: 15, hp: 30, spd: 58, col: '#e6e9f2', dmg: 12, xp: 2, ai: 'ghost' },
     jack:   { r: 30, hp: 900,  spd: 55, col: '#3aa7a0', dmg: 15, xp: 30, ai: 'jack',  elite: 'JACK ジャック', glyph: 'J' },
@@ -418,7 +418,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     archer: '射手：距離を取って弾を撃つ', brute: 'ブルート：太鼓で周りの敵を速くする。最優先で倒そう',
     bomber: '爆弾：近づくと点火して爆発', ghost: 'おばけ：敵の群れをすり抜けてくる',
   };
-  const BASE_W = { slime: 4, bat: 3, boar: 2, archer: 2, brute: 1, bomber: 1.8, ghost: 2 };
+  const BASE_W = { slime: 4, bat: 3, boar: 1.5, archer: 2, brute: 1, bomber: 1.8, ghost: 2 };
   function stageCfg(n) {
     const th = THEMES[(n - 1) % 3];
     const c = { n, name: `STAGE ${n}`, sub: th.sub, bg: th.bg };
@@ -440,19 +440,21 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       return c;
     }
     Object.assign(c, {
-      hp0: Math.pow(1.6, n - 1) * .8, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(1.75, n - 1) * .75, dmgMul: Math.pow(1.18, n - 1),
+      hp0: Math.pow(1.5, n - 1) * .8, spawn: Math.min(2.6, 1 + (n - 1) * .15), eliteMul: Math.pow(1.6, n - 1) * .75, dmgMul: Math.pow(1.13, n - 1),
       // bosses act faster, fire denser and quicker patterns as stages go on
-      tempo: Math.min(1.6, 1 + (n - 1) * .08), dens: Math.min(2, 1 + (n - 1) * .12), bsp: Math.min(1.4, 1 + (n - 1) * .05), mspd: Math.min(1.5, 1 + (n - 1) * .04),
+      tempo: Math.min(1.6, 1 + (n - 1) * .06), dens: Math.min(2, 1 + (n - 1) * .1), bsp: Math.min(1.4, 1 + (n - 1) * .05), mspd: Math.min(1.5, 1 + (n - 1) * .04),
       xpMul: 1 + (n - 1) * .15, gemLife: Math.max(20, 40 - (n - 2) * 5), bomberR: Math.min(115, 70 + Math.max(0, n - 6) * 7),
     });
-    const swarmType = k => (k === 'brute' || k === 'archer') ? 'bat' : k;
+    const swarmType = k => (k === 'brute' || k === 'archer') ? 'bat' : k === 'boar' ? 'slime' : k;
     const finals = ['king', 'witch', 'joker'];
     const fin = finals[(n - 1) % 3];
     if (n === 2) c.events = [{ t: 35, swarm: 'bat', n: 16 }, { t: 75, boss: 'queen' }, { t: 115, swarm: 'slime', n: 20 }, { t: BOSS_AT, boss: 'witch', final: true }];
     else {
       const mids = ['jack', 'queen', 'king', 'witch'].filter(k => k !== fin);
       const m1 = mids[(n * 7) % mids.length], m2 = mids[(n * 7 + 1) % mids.length];
-      c.events = [{ t: 35, swarm: swarmType(newest), n: Math.min(8 + n, 16) }, { t: 60, boss: m1 }, { t: 100, boss: m2 }, { t: 125, swarm: 'bat', n: 18 + n * 2 }, { t: BOSS_AT, boss: fin, final: true }];
+      c.events = n <= 4
+        ? [{ t: 35, swarm: swarmType(newest), n: Math.min(8 + n, 16) }, { t: 75, boss: m1 }, { t: 120, swarm: 'bat', n: 16 + n * 2 }, { t: BOSS_AT, boss: fin, final: true }]
+        : [{ t: 35, swarm: swarmType(newest), n: Math.min(8 + n, 16) }, { t: 60, boss: m1 }, { t: 100, boss: m2 }, { t: 125, swarm: 'bat', n: 18 + n * 2 }, { t: BOSS_AT, boss: fin, final: true }];
     }
     return c;
   }
@@ -702,10 +704,10 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
         return [vx, vy];
       }
       case 'tackle': {
-        if (e.st === 0) { if (d < 240 && e.cd <= 0) { e.st = 1; e.stT = .75; aimDash(e, d, dx, dy, 70, 320, 380); } return [ux * e.spd, uy * e.spd]; }
+        if (e.st === 0) { if (d < 240 && e.cd <= 0) { e.st = 1; e.stT = .85; aimDash(e, d, dx, dy, 70, 320, 380); } return [ux * e.spd, uy * e.spd]; }
         if (e.st === 1) { if (e.stT <= 0) { e.st = 2; e.stT = e.dashLen / e.dashSpd; sfx('dash', 80, () => tone(150, .15, 'sawtooth', .03, 0, 90)); } return [0, 0]; }
         if (e.st === 2) { if (e.stT <= 0) { e.st = 3; e.stT = .7; } return [Math.cos(e.ang) * e.dashSpd, Math.sin(e.ang) * e.dashSpd]; }
-        if (e.stT <= 0) { e.st = 0; e.cd = rand(1.5, 2.5); } return [ux * e.spd * .3, uy * e.spd * .3];
+        if (e.stT <= 0) { e.st = 0; e.cd = rand(2.2, 3.2); } return [ux * e.spd * .3, uy * e.spd * .3];
       }
       case 'bomber': {
         const R2 = stage.bomberR;
@@ -877,7 +879,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
       let k = 1;
       if (e.elite) {
         e.age += dt;
-        if (!e.enraged && e.age > 45) { e.enraged = true; banner(`${e.name.split(' ')[1]} 激昂！`, '攻撃が速くなった', true); tone(90, .5, 'sawtooth', .06, 0, 50); }
+        if (!e.enraged && e.age > 60) { e.enraged = true; banner(`${e.name.split(' ')[1]} 激昂！`, '攻撃が速くなった', true); tone(90, .5, 'sawtooth', .06, 0, 50); }
         k = stage.tempo * (e.enraged ? 1.35 : 1);
       }
       let [vx, vy] = think(e, dt * k, dx, dy, d);
@@ -997,7 +999,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     g.score += stageScore();
     const n = g.stageNo;
     // prepare the next stage now so the save is ready even if the page closes
-    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * .3); g.rerolls = Math.min(REROLL_MAX, g.rerolls + 1);
+    g.p.hp = Math.min(g.p.maxHp, g.p.hp + g.p.maxHp * .5); g.rerolls = Math.min(REROLL_MAX, g.rerolls + 1);
     g.stageNo = n + 1;
     const snap = snapshot(); g.stageNo = n;
     store.set('cs2_save', snap);
