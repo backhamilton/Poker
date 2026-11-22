@@ -196,6 +196,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     <div class="steps">
       <div><b>ドラッグで移動</b>。攻撃は自動。敵が落とす<b>チップ</b>でレベルアップし、<b>3枚から1枚</b>選んで手札へ。5枚そろうと<b>役に応じて強化</b>。</div>
       <div>2分30秒でボス。倒すと強さを<b>引き継いで次のステージ</b>へ。ステージは無限。</div>
+      <div>自分の弾は<b>敵の弾を打ち消せる</b>。衝撃波（フォーカード）でも消える。</div>
       <div>稼いだ得点は<b>スキルショップ</b>で永久強化に使える。強くなって、もっと先のステージへ。</div>
     </div>
     <div class="sectionlbl">セーブスロット</div>
@@ -380,7 +381,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
   const HANDS = {
     royal: { name: 'ロイヤルフラッシュ', lv: 9, desc: '全強化＋敵一掃！' },
     sf: { name: 'ストレートフラッシュ', lv: 8, desc: '全強化＋敵一掃！' },
-    four: { name: 'フォーカード', lv: 7, desc: '周囲に衝撃波（定期発動・重ねると範囲と頻度UP）' },
+    four: { name: 'フォーカード', lv: 7, desc: '周囲に衝撃波（定期発動・敵の弾も消す・重ねると範囲と頻度UP）' },
     fh: { name: 'フルハウス', lv: 6, desc: '最大HP+25・全回復' },
     flush: { name: 'フラッシュ', lv: 5, desc: '体のまわりを回るカード+1' },
     straight: { name: 'ストレート', lv: 4, desc: '移動・弾速UP・貫通+1' },
@@ -928,6 +929,15 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
     for (const b of g.bul) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.a += dt * 14;
+      for (const q of g.ebul) {
+        if (q.life <= 0) continue;
+        if ((q.x - b.x) ** 2 + (q.y - b.y) ** 2 < (q.r + 6) ** 2) {
+          q.life = 0; popBullet(q);
+          sfx('cancel', 50, () => tone(1600, .03, 'triangle', .02));
+          if (b.pierce-- <= 0) { b.life = 0; break; }
+        }
+      }
+      if (b.life <= 0) continue;
       for (const e of g.en) {
         if (e.dead || b.hit.includes(e)) continue;
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < (e.r + 7) ** 2) {
@@ -953,6 +963,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
         const rad = Math.min(230, 120 + s.nova * 15);
         g.rings.push({ x: p.x, y: p.y, r: 0, max: rad, col: '#ffe08a' });
         for (const e of g.en) { const d = Math.hypot(e.x - p.x, e.y - p.y) || 1; if (d < rad + e.r) hitEnemy(e, 15 + s.dmg * 1.2, (e.x - p.x) / d * 4, (e.y - p.y) / d * 4); }
+        for (const q of g.ebul) if (q.life > 0 && Math.hypot(q.x - p.x, q.y - p.y) < rad) { q.life = 0; popBullet(q); }
         tone(180, .25, 'sine', .05, 0, 90);
       }
     }
@@ -1001,6 +1012,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     }
 
     for (const b of g.ebul) {
+      if (b.life <= 0) continue; // already cancelled by a shot or the shockwave this frame
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
       const d = Math.hypot(b.x - p.x, b.y - p.y);
       if (d < b.r + 7) { b.life = 0; hurt(Math.round(10 * stage.dmgMul), 'bullet'); }
@@ -1061,6 +1073,10 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     if (p.hp <= 0) playerDown();
   }
   // HP hit zero: use the shop's revive if there is one left, otherwise the run ends
+  function popBullet(q) {
+    if (g.parts.length > 400) return;
+    for (let i = 0; i < 3; i++) { const a = Math.random() * 7, v = rand(30, 90); g.parts.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: .25, col: '#ffffff' }); }
+  }
   function playerDown() {
     const p = g.p;
     if (g.revives > 0) {
