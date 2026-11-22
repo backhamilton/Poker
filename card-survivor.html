@@ -196,7 +196,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     <div class="steps">
       <div><b>ドラッグで移動</b>。攻撃は自動。敵が落とす<b>チップ</b>でレベルアップし、<b>3枚から1枚</b>選んで手札へ。5枚そろうと<b>役に応じて強化</b>。</div>
       <div>2分30秒でボス。倒すと強さを<b>引き継いで次のステージ</b>へ。ステージは無限。</div>
-      <div>自分の弾は<b>敵の弾を打ち消せる</b>。衝撃波（フォーカード）でも消える。</div>
+      <div>自分の弾は<b>敵の弾を打ち消せる</b>。回るカード（フラッシュ）と衝撃波（フォーカード）でも消える。</div>
       <div>稼いだ得点は<b>スキルショップ</b>で永久強化に使える。強くなって、もっと先のステージへ。</div>
     </div>
     <div class="sectionlbl">セーブスロット</div>
@@ -383,7 +383,7 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
     sf: { name: 'ストレートフラッシュ', lv: 8, desc: '全強化＋敵一掃！' },
     four: { name: 'フォーカード', lv: 7, desc: '周囲に衝撃波（定期発動・敵の弾も消す・重ねると範囲と頻度UP）' },
     fh: { name: 'フルハウス', lv: 6, desc: '最大HP+25・全回復' },
-    flush: { name: 'フラッシュ', lv: 5, desc: '体のまわりを回るカード+1' },
+    flush: { name: 'フラッシュ', lv: 5, desc: '体のまわりを回るカード+1（敵の弾も消す）' },
     straight: { name: 'ストレート', lv: 4, desc: '移動・弾速UP・貫通+1' },
     three: { name: 'スリーカード', lv: 3, desc: '攻撃力+35%（足し算）' },
     two: { name: 'ツーペア', lv: 2, desc: '同時に撃つ弾+1' },
@@ -955,6 +955,8 @@ table.pay tr.now td { background: rgba(242,179,61,.14); }
         if (e.dead || g.t - e.orbHit < .3) continue;
         if ((e.x - ox) ** 2 + (e.y - oy) ** 2 < (e.r + 11) ** 2) { e.orbHit = g.t; hitEnemy(e, s.dmg * 1.1, (e.x - p.x) * .05, (e.y - p.y) * .05); }
       }
+      // orbiting cards also block enemy bullets they sweep through
+      for (const q of g.ebul) if (q.life > 0 && (q.x - ox) ** 2 + (q.y - oy) ** 2 < (q.r + 11) ** 2) { q.life = 0; popBullet(q); }
     }
     if (s.nova > 0) {
       g.novaT -= dt;
